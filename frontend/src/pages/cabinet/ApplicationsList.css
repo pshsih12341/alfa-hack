@@ -1,0 +1,146 @@
+.applications-page {
+  width: min(100%, 1040px);
+  margin: 0 auto;
+}
+
+.applications-page__header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 32px;
+  margin-bottom: 32px;
+}
+
+.applications-page__eyebrow {
+  display: block;
+  margin-bottom: 10px;
+  color: #ef3124;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.applications-page__header h1 {
+  margin: 0 0 12px;
+  color: #111113;
+  font-size: 48px;
+  line-height: 1;
+  letter-spacing: -1.8px;
+}
+
+.applications-page__header p {
+  margin: 0;
+  color: #737378;
+  font-size: 16px;
+}
+
+.applications-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.application-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 300px;
+  padding: 28px;
+  border: 1px solid #e7e7e8;
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(16, 16, 18, 0.04);
+}
+
+.application-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.application-card__number {
+  color: #77777c;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.application-card__status {
+  padding: 7px 10px;
+  border-radius: 100px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.application-card__status_info,
+.application-card__status_prescoring {
+  color: #805b00;
+  background: #fff2cc;
+}
+
+.application-card__status_success {
+  color: #137a45;
+  background: #e4f7eb;
+}
+
+.application-card__status_rejected {
+  color: #b42318;
+  background: #feeceb;
+}
+
+.application-card h2 {
+  min-height: 48px;
+  margin: 0 0 24px;
+  color: #222225;
+  font-size: 20px;
+  line-height: 1.25;
+}
+
+.application-card__amount {
+  color: #111113;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -1px;
+}
+
+.application-card__amount-label {
+  margin: 4px 0 28px;
+  color: #8b8b90;
+  font-size: 13px;
+}
+
+.application-card > button {
+  margin-top: auto;
+}
+
+.new-application-form {
+  display: grid;
+  gap: 16px;
+}
+
+.new-application-required {
+  color: #ef3124;
+}
+
+@media (max-width: 760px) {
+  .applications-page__header {
+    display: block;
+  }
+
+  .applications-page__header h1 {
+    font-size: 38px;
+  }
+
+  .applications-page__header > button {
+    width: 100%;
+    margin-top: 24px;
+  }
+
+  .applications-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .application-card {
+    min-height: 280px;
+    padding: 22px;
+  }
+}

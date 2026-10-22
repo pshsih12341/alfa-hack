@@ -1,0 +1,139 @@
+.personal-data-page {
+  display: grid;
+  gap: 20px;
+}
+
+.personal-data-card,
+.additional-data-card {
+  scroll-margin-top: 24px;
+  padding: 40px;
+  border-radius: 28px;
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(16, 16, 18, 0.04);
+}
+
+.required-mark {
+  color: #ef3124;
+}
+
+.personal-data-heading,
+.additional-data-heading {
+  max-width: 640px;
+  margin-bottom: 32px;
+}
+
+.personal-data-heading > span,
+.additional-data-heading > span {
+  display: block;
+  margin-bottom: 12px;
+  color: #ef3124;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.personal-data-heading h1,
+.additional-data-heading h2 {
+  margin: 0 0 12px;
+  color: #111113;
+  font-size: 36px;
+  line-height: 1.1;
+  letter-spacing: -1.2px;
+}
+
+.personal-data-heading p,
+.additional-data-heading p {
+  margin: 0;
+  color: #737378;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.personal-data-list {
+  margin: 0;
+}
+
+.personal-data-list > div {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 24px;
+  padding: 18px 0;
+  border-top: 1px solid #ededee;
+}
+
+.personal-data-list dt,
+.personal-data-list dd {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.personal-data-list dt {
+  color: #85858a;
+}
+
+.personal-data-list dd {
+  color: #242426;
+  font-weight: 600;
+}
+
+.additional-data-form {
+  max-width: 620px;
+  display: grid;
+  gap: 16px;
+}
+
+.additional-data-form > button {
+  margin-top: 8px;
+}
+
+.additional-data-success {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  max-width: 620px;
+  padding: 20px;
+  border-radius: 18px;
+  color: #176f43;
+  background: #e8f7ee;
+}
+
+.additional-data-success > span {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: #20a563;
+  font-weight: 700;
+}
+
+.additional-data-success strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.additional-data-success p {
+  margin: 0;
+  color: #367d59;
+  font-size: 14px;
+}
+
+@media (max-width: 760px) {
+  .personal-data-card,
+  .additional-data-card {
+    padding: 28px 20px;
+    border-radius: 24px;
+  }
+
+  .personal-data-heading h1,
+  .additional-data-heading h2 {
+    font-size: 30px;
+  }
+
+  .personal-data-list > div {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+}
