@@ -1,42 +1,42 @@
 # Кредитный кабинет для малого и среднего бизнеса (МСБ)
 
-Контролль заявок на кредит: регистрация по номеру телефона, авторизация
-(кука `ck_session`, дольшняя — 30 суток), личный кабинет. Бэкенд (FastAPI
-+ SQLite) — только API, без UI.
+Контроль заявок на кредит: регистрация по номеру телефона, авторизация
+(кука `ck_session`, долгоживущая — 30 суток), личный кабинет.
+Бэкенд (FastAPI + SQLAlchemy) — только API, без UI.
 
 ## Состав
 
-- **backend/** — FastAPI-приложение: API, SQLite, CORS
-- **frontend/** — отдельный проект (Next.js и т.д.), создаёт фронтендер
-- **docs/** — `api.md` — контракт API
+- `backend/` — FastAPI-приложение: API, SQLite (stage 1), CORS, Alembic-миграции
+- `frontend/` — отдельный проект на React (Vite/CRA), создаёт фронтендер
+- `docs/api.md` — контракт API (единственный источник правды)
+
+## Архитектура
+
+Два независимых сервиса:
+
+- **backend** — чистое API. `GET /` отдаёт `404` (статику не раздаёт).
+  Точки входа — `/docs` (Swagger) и `/api/*`.
+- **frontend** — отдельный проект, ходит в API либо через dev-proxy
+  (`/api` → `:8000`), либо напрямую с `credentials: 'include'`.
+  Подробности — `docs/api.md`, раздел «Интеграция фронтенда».
+
+Сейчас (stage 1) БД — SQLite, чтобы быстро стартовать.
+Целевая архитектура (stage 2): **PostgreSQL** (основная БД, ACID,
+конкурентность) + **Redis** (сессии, кэш). Заготовки для перехода уже в коде:
+`docker-compose.yml`, `backend/app/session_store.py`, `backend/app/cache.py`,
+`alembic`.
 
 ## Запуск
-
-Проект состоит из двух независимых сервисов. Поднимает каждый разработчик.
 
 ### Бэкенд (FastAPI, API + SQLite)
 
 ```bash
 cd backend
 cp .env.example .env
+alembic upgrade head          # создать схему (users, sessions)
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
-
-Порт: `8000`. Документация API: http://localhost:8000/docs
-
-### Фронтенд
-
-Скаффолд создаёт фронтендер (Next.js по умолчанию, порт 3000):
-
-```bash
-npx create-next-app@latest frontend
-cd frontend
-npm run dev
-```
-
-Порт уточняется фронтендером (по умолчанию 3000).
-
-## Команда
+# Команда
 
 - belova polina — business analyst
 - lisitsyn ivan — backend
@@ -44,9 +44,3 @@ npm run dev
 - babaev misirkhan — data scientist
 - ishbylatov ildar - frontend
 
-## Документация
-
-- Backend: `backend/README.md`
-- Frontend: `frontend/README.md`
-- API-контракт: `docs/api.md`
-- Интеграция фронтенда: `docs/api.md` → раздел «Интеграция фронтенда»
