@@ -29,17 +29,9 @@ def register(payload: schemas.RegisterRequest, request: Request):
         db.add(user)
         db.commit()
         db.refresh(user)
-    token = auth.create_session(user.id, config.settings.COOKIE_MAX_AGE)
+    token = auth.create_session(auth.get_session_store(), user.id, config.settings.COOKIE_MAX_AGE)
     response = JSONResponse(content={"clientId": user.id}, status_code=201)
-    response.set_cookie(
-        key=config.settings.COOKIE_NAME,
-        value=token,
-        max_age=config.settings.COOKIE_MAX_AGE,
-        httponly=True,
-        secure=config.settings.COOKIE_SECURE,
-        samesite=config.settings.COOKIE_SAME_SITE,
-        path="/",
-    )
+    auth._set_auth_cookie(response, token)
     return response
 
 
@@ -52,19 +44,11 @@ def login(payload: schemas.LoginRequest, request: Request):
         ).scalar_one_or_none()
         if user is None:
             raise HTTPException(status_code=401, detail="Неверный номер телефона")
-        token = auth.create_session(user.id, config.settings.COOKIE_MAX_AGE)
+        token = auth.create_session(auth.get_session_store(), user.id, config.settings.COOKIE_MAX_AGE)
     response = JSONResponse(
         content={"clientId": user.id, "isAdmin": bool(user.is_admin)}
     )
-    response.set_cookie(
-        key=config.settings.COOKIE_NAME,
-        value=token,
-        max_age=config.settings.COOKIE_MAX_AGE,
-        httponly=True,
-        secure=config.settings.COOKIE_SECURE,
-        samesite=config.settings.COOKIE_SAME_SITE,
-        path="/",
-    )
+    auth._set_auth_cookie(response, token)
     return response
 
 

@@ -14,7 +14,4 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# БД создаётся на старте (удобно для SQLite).
-database.Base.metadata.create_all(bind=database.engine)
-
 app.include_router(routers.users.router)
