@@ -42,6 +42,7 @@ npm run dev
 - lisitsyn ivan — backend
 - ryskulov ormonkhan — product
 - babaev misirkhan — data scientist
+- ishbylatov ildar - frontend
 
 ## Документация
 
