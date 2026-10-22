@@ -151,3 +151,62 @@ Content-Type: application/json
 
 Таблицы (SQLite): `users` (id, phone_number, credit_sum, purpose, income, inn, is_admin, created_at) и `sessions` (id, client_id, token, created_at, expires_at).
 `clientId` — UUID (строка). `phone_number` — уникальный индекс.
+
+---
+
+## Интеграция фронтенда
+
+Фронтенд — отдельный проект (стек — на усмотрение фронтендера, рекомендуется
+Next.js, порт 3000 по умолчанию). Бэк не зависит от UI.
+
+### 1. Кука auth
+
+- Имя: `ck_session`, HTTP-only, `SameSite=Lax`, `max-age=30` дней, `Secure=false` (локальная среда).
+- При логине бэк устанавливает куку; фронтенд её подхватывает автоматически.
+
+### 2. Источник запросов
+
+**Способ A — dev-proxy (рекомендуется).** В `next.config.js` (или `vite.config.js`)
+создаём `rewrites()`, пробрасывающие `/api/*` на бэк:
+
+```js
+async rewrites() {
+  return [{ source: '/api/:path*', destination: 'http://localhost:8000/api/:path*' }];
+}
+```
+
+Фронт обращается к `/api/...` (same-origin), кука `ck_session` автоматически
+отправляется как same-origin, **CORS вообще не участвует**.
+
+**Способ Б — прямой fetch на `http://localhost:8000`:**
+
+```js
+fetch('http://localhost:8000/api/users/me', { credentials: 'include' })
+```
+
+Тогда в `backend/.env` должно быть:
+
+```env
+CORS_ORIGINS=http://localhost:3000
+```
+
+И бэк отдаст `Access-Control-Allow-Origin: http://localhost:3000`
+(см. `OPTIONS /api/users/login` в тестах).
+
+### 3. Типы для TS
+
+Сгенерировать из OpenAPI-спецификации бэка:
+
+```bash
+npx openapi-typescript http://localhost:8000/openapi.json -o types.ts
+```
+
+(или `openapi-ts`, `orval` — на вкус команды).
+
+### 4. Пример запроса на стороне фронтенда
+
+```ts
+const res = await fetch('/api/users/me', { credentials: 'include' });
+const user = await res.json();
+```
+
