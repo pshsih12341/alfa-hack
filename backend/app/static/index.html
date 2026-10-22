@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Кредитный кабинет СМИ</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 24px; max-width: 720px; margin: 0 auto; background: #f5f6f8; color: #1a1a1a; }
+  h1 { font-size: 22px; margin: 0 0 8px; }
+  .sub { color: #666; margin-bottom: 20px; }
+  .card { background: #fff; border: 1px solid #e3e5e8; border-radius: 10px; padding: 20px; margin-bottom: 16px; }
+  label { display: block; font-size: 13px; color: #555; margin: 12px 0 6px; }
+  input { width: 100%; padding: 10px; font-size: 15px; border: 1px solid #c9ccd1; border-radius: 8px; }
+  button { background: #16425b; color: #fff; border: none; padding: 12px 16px; font-size: 15px; border-radius: 8px; cursor: pointer; width: 100%; margin-top: 16px; }
+  button:hover { background: #12364f; }
+  button.secondary { background: #e4e7ea; color: #1a1a1a; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 1px solid #e3e5e8; }
+  .tab { padding: 8px 12px; cursor: pointer; border-bottom: 2px solid transparent; color: #555; }
+  .tab.active { color: #16425b; border-bottom-color: #16425b; font-weight: 600; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+  #msg, #login-msg { margin-top: 12px; font-size: 14px; }
+  .ok { color: #1a7f37; }
+  .err { color: #c62828; }
+  .auth-badge { display: flex; justify-content: space-between; align-items: center; padding: 16px; border: 1px solid #e3e5e8; border-radius: 10px; background: #fff; }
+  .auth-badge .name { font-weight: 600; }
+  .auth-badge .meta { color: #666; font-size: 13px; }
+  #me-detail { margin-top: 16px; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+  <h1>Кредитный кабинет СМИ</h1>
+  <p class="sub">Управление заявками на кредит</p>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="reg">Регистрация</div>
+    <div class="tab" data-tab="login">Войти</div>
+    <div class="tab" data-tab="me">Личный кабинет</div>
+  </div>
+
+  <!-- Регистрация -->
+  <div class="tab-content active" id="tab-reg">
+    <div class="card">
+      <h2>Регистрация</h2>
+      <form id="reg-form">
+        <label for="r-phone">Номер телефона</label>
+        <input id="r-phone" name="phoneNumber" type="tel" placeholder="+7 999 123 45 67" required>
+        <label for="r-sum">Сумма кредита (руб.)</label>
+        <input id="r-sum" name="creditSum" type="number" min="0" placeholder="1000000" required>
+        <label for="r-purpose">Цель кредита</label>
+        <input id="r-purpose" name="purpose" type="text" placeholder="Пополнение оборотных средств" required>
+        <label for="r-income">Прибыль компании (руб.)</label>
+        <input id="r-income" name="income" type="number" min="0" placeholder="250000" required>
+        <label for="r-inn">ИНН или ОГРН</label>
+        <input id="r-inn" name="inn" type="text" placeholder="7707083893">
+        <button type="submit">Зарегистрироваться</button>
+      </form>
+      <div id="msg"></div>
+    </div>
+  </div>
+
+  <!-- Логин -->
+  <div class="tab-content" id="tab-login">
+    <div class="card">
+      <h2>Войти</h2>
+      <form id="login-form">
+        <label for="l-phone">Номер телефона</label>
+        <input id="l-phone" name="phoneNumber" type="tel" placeholder="+7 999 123 45 67" required>
+        <button type="submit">Войти</button>
+      </form>
+      <div id="login-msg"></div>
+    </div>
+  </div>
+
+  <!-- Личный кабинет -->
+  <div class="tab-content" id="tab-me">
+    <div class="card">
+      <h2>Личный кабинет</h2>
+      <div class="auth-badge">
+        <div class="name" id="me-name">Загрузка…</div>
+        <div class="meta"><span id="me-client"></span></div>
+      </div>
+      <div id="me-detail" class="hidden">
+        <p class="sub">Данные заявки</p>
+        <p><strong>Сумма кредита:</strong> <span id="d-sum"></span></p>
+        <p><strong>Цель:</strong> <span id="d-purpose"></span></p>
+        <p><strong>Прибыль:</strong> <span id="d-income"></span></p>
+        <p><strong>ИНН/ОГРН:</strong> <span id="d-inn"></span></p>
+        <button class="secondary" id="me-logout">Выйти</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+const tabs = document.querySelectorAll('.tab');
+tabs.forEach(t => t.addEventListener('click', () => {
+  tabs.forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tab-' + t.dataset.tab).classList.add('active');
+}));
+
+async function api(path, options) {
+  const res = await fetch(path, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options
+  });
+  return res.json().then(data => ({ status: res.status, data }));
+}
+
+(async () => {
+  const r = await api('/api/users/me');
+  if (r.status === 200) {
+    const u = r.data;
+    document.getElementById('me-name').textContent = u.phoneNumber;
+    document.getElementById('me-client').textContent = 'ID: ' + u.clientId + (u.isAdmin ? ' (админ)' : '');
+    document.getElementById('d-sum').textContent = u.creditSum.toLocaleString('ru-RU');
+    document.getElementById('d-purpose').textContent = u.purpose;
+    document.getElementById('d-income').textContent = u.income.toLocaleString('ru-RU');
+    document.getElementById('d-inn').textContent = u.inn;
+    document.getElementById('me-detail').classList.remove('hidden');
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelector('[data-tab="me"]').classList.add('active');
+    document.getElementById('tab-me').classList.add('active');
+  } else {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelector('[data-tab="reg"]').classList.add('active');
+    document.getElementById('tab-me').classList.remove('active');
+  }
+})();
+
+document.getElementById('reg-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.target).entries());
+  const msg = document.getElementById('msg');
+  msg.className = '';
+  msg.textContent = 'Отправка…';
+  const r = await api('/api/users/reg', { method: 'POST', body: JSON.stringify(data) });
+  if (r.status === 201) {
+    msg.className = 'ok';
+    msg.textContent = 'Готово! clientId: ' + r.data.clientId;
+  } else {
+    msg.className = 'err';
+    msg.textContent = (r.data && r.data.detail) || 'Ошибка';
+  }
+});
+
+document.getElementById('login-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.target).entries());
+  const msg = document.getElementById('login-msg');
+  msg.className = '';
+  msg.textContent = 'Вход…';
+  const r = await api('/api/users/login', { method: 'POST', body: JSON.stringify(data) });
+  if (r.status === 200) {
+    msg.className = 'ok';
+    msg.textContent = 'Вход выполнен. clientId: ' + r.data.clientId + (r.data.isAdmin ? ' (админ)' : '');
+    location.reload();
+  } else {
+    msg.className = 'err';
+    msg.textContent = (r.data && r.data.detail) || 'Ошибка';
+  }
+});
+
+document.getElementById('me-logout').addEventListener('click', () => {
+  document.cookie = 'ck_session=; Max-Age=0; path=/';
+  location.reload();
+});
+</script>
+</body>
+</html>
