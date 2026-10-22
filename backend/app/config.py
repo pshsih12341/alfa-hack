@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     COOKIE_MAX_AGE: int = 60 * 60 * 24 * 30  # 30 дней
     COOKIE_SECURE: bool = False
     COOKIE_SAME_SITE: Literal["lax", "strict", "none"] = "lax"
+    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:3000"
 
 
 settings = Settings()
