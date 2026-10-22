@@ -28,6 +28,14 @@
 
 ## Запуск
 
+### Фронтенд и инфраструктура через Docker
+
+```bash
+docker compose up --build
+```
+
+Фронтенд будет доступен на `http://localhost:3000`.
+
 ### Бэкенд (FastAPI, API + SQLite)
 
 ```bash
