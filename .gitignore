@@ -45,4 +45,4 @@ temp/
 .env.docker
 backend/.env
 backend/.env.docker
-pgdata/
+pgdata/mocks/datasets/

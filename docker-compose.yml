@@ -33,7 +33,7 @@ services:
       COOKIE_SAME_SITE: lax
       CORS_ORIGINS: http://localhost:8080,http://localhost:8000
       AUTO_CREATE_TABLES: "false"
-      SCORING_MODE: mock
+      SCORING_MODE: ml
       SCORING_URL: http://ml:8001
       SCORING_TIMEOUT_SECONDS: "5"
     depends_on:
