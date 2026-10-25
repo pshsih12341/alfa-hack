@@ -11,18 +11,23 @@
 import numpy as np
 import pandas as pd
 
-from alfa_ml.decision import heuristic, stop_rules
+from alfa_ml.decision import stop_rules
 from alfa_ml.decision.stage1 import (Application, Decision, Option, application_data, flat_seasonality,
                                      max_by_term_options, percent, pick_offers, product, rate_buckets, rub)
 from alfa_ml.features.build import model2_features, profile, repeat_profile
 from alfa_ml.finance import annuity_payment
+from alfa_ml.models.scorecard import MODEL2_FILE, load_model
 from alfa_ml.sources.read import SourceData
 
 
 def decide_stage2(src: SourceData, statements: pd.DataFrame, app: Application, as_of, scoring_cfg: dict,
-                  rules_cfg: dict, seasonality: pd.DataFrame, predict_pd=heuristic.predict_pd2,
-                  model_version: str = heuristic.MODEL2_VERSION) -> Decision:
-    """statements — помесячные обороты по всем предоставленным счетам (колонки alfa_turnover)."""
+                  rules_cfg: dict, seasonality: pd.DataFrame, predict_pd=None,
+                  model_version: str | None = None) -> Decision:
+    """statements — помесячные обороты по всем предоставленным счетам (колонки alfa_turnover).
+    predict_pd и model_version по умолчанию — обученная модель 2 из ml/artifacts."""
+    if predict_pd is None:
+        model = load_model(MODEL2_FILE)
+        predict_pd, model_version = model.predict_pd, model.version
     hits = stop_rules.check_stop_rules(src.companies, src.persons, as_of, rules_cfg, scoring_cfg["stop_rules"])
     if hits:
         return Decision("REJECTED", 2, None, model_version, client_message=stop_rules.client_message(hits),

@@ -21,11 +21,11 @@ from sqlalchemy import Engine, text
 
 from alfa_ml.artifacts import load_seasonality
 from alfa_ml.config import load_config
-from alfa_ml.decision.heuristic import MODEL2_VERSION, MODEL_VERSION
 from alfa_ml.decision.stage1 import Application, Decision, Option, RevenueRequired, decide_stage1, product
 from alfa_ml.decision.stage2 import decide_stage2
 from alfa_ml.features.build import okved_group, revenue_source
 from alfa_ml.inn import is_valid_inn
+from alfa_ml.models.scorecard import MODEL1_FILE, MODEL2_FILE, load_model
 from alfa_ml.service.db import make_engine, snapshot_date
 from alfa_ml.service.settings import Settings
 from alfa_ml.sources.read import SourceData, read_sources
@@ -160,6 +160,7 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
     scoring_cfg = load_config("scoring")
     rules_cfg = load_config("rules")
     seasonality = load_seasonality(scoring_cfg)
+    model1, model2 = load_model(MODEL1_FILE), load_model(MODEL2_FILE)
     terms = scoring_cfg["terms_months"]
     amount_limit = Limits(min=scoring_cfg["min_amount"], max=scoring_cfg["max_amount"], step=scoring_cfg["amount_step"])
     term_limit = Limits(min=terms[0], max=terms[-1], step=terms[1] - terms[0])
@@ -211,7 +212,7 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
             with engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
                 return Health(status="ok", database="ok", as_of=as_of(conn),
-                              model_version=f"{MODEL_VERSION}; {MODEL2_VERSION}")
+                              model_version=f"{model1.version}; {model2.version}")
         except Exception:
             body = Health(status="degraded", database="error", as_of=None)
             return JSONResponse(status_code=503, content=body.model_dump(mode="json", by_alias=True))
@@ -230,10 +231,12 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
                                    tuple(request.refinance_loan_ids), request.revenue_last12m, request.has_collateral)
         if request.use_alfa_account or request.statements:
             statements = statement_months(request, data, date)
-            decision = decide_stage2(data, statements, application, date, scoring_cfg, rules_cfg, seasonality)
+            decision = decide_stage2(data, statements, application, date, scoring_cfg, rules_cfg, seasonality,
+                                     model2.predict_pd, model2.version)
         else:
             try:
-                decision = decide_stage1(data, application, date, scoring_cfg, rules_cfg)
+                decision = decide_stage1(data, application, date, scoring_cfg, rules_cfg,
+                                         model1.predict_pd, model1.version)
             except RevenueRequired as error:
                 raise HTTPException(status_code=422, detail=f"{error} (revenueLast12m)") from error
         response = _score_response(decision, product(application))

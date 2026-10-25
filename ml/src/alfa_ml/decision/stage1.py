@@ -15,9 +15,10 @@ from types import SimpleNamespace
 import numpy as np
 import pandas as pd
 
-from alfa_ml.decision import heuristic, stop_rules
+from alfa_ml.decision import stop_rules
 from alfa_ml.features.build import model1_features, profile, repeat_profile, stage1_dscr
 from alfa_ml.finance import annuity_payment, rate_for_pd
+from alfa_ml.models.scorecard import MODEL1_FILE, load_model
 from alfa_ml.sources.read import SourceData
 
 SOURCE_NAMES = {"alfa_full": "обороты в Альфе за 12 мес.", "alfa_partial": "обороты в Альфе меньше 12 мес.",
@@ -103,7 +104,11 @@ def flat_seasonality(scoring_cfg: dict) -> pd.DataFrame:
 
 
 def decide_stage1(src: SourceData, app: Application, as_of, scoring_cfg: dict, rules_cfg: dict,
-                  predict_pd=heuristic.predict_pd, model_version: str = heuristic.MODEL_VERSION) -> Decision:
+                  predict_pd=None, model_version: str | None = None) -> Decision:
+    """predict_pd и model_version по умолчанию — обученная модель 1 из ml/artifacts."""
+    if predict_pd is None:
+        model = load_model(MODEL1_FILE)
+        predict_pd, model_version = model.predict_pd, model.version
     hits = stop_rules.check_stop_rules(src.companies, src.persons, as_of, rules_cfg, scoring_cfg["stop_rules"])
     if hits:
         return Decision("REJECTED", 1, None, model_version, client_message=stop_rules.client_message(hits),

@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from alfa_ml.artifacts import load_seasonality
 from alfa_ml.config import load_config
-from alfa_ml.decision.heuristic import MODEL2_VERSION, MODEL_VERSION
+from alfa_ml.models.scorecard import MODEL1_FILE, MODEL2_FILE, load_model
 from alfa_ml.decision.stage1 import Application
 from alfa_ml.decision.stage2 import decide_stage2
 from alfa_ml.features.build import okved_group, revenue_source
@@ -48,7 +48,7 @@ def test_health_reports_snapshot_date(client):
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok", "database": "ok", "asOf": AS_OF,
-                               "modelVersion": f"{MODEL_VERSION}; {MODEL2_VERSION}"}
+                               "modelVersion": f"{load_model(MODEL1_FILE).version}; {load_model(MODEL2_FILE).version}"}
 
 
 def test_health_degraded_without_database(tmp_path):
