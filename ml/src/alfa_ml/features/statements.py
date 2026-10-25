@@ -12,8 +12,9 @@ OPERATIONAL_OUTFLOWS = ["outflow_suppliers", "outflow_salary", "outflow_rent", "
 def monthly_cash_flow(monthly: pd.DataFrame) -> pd.DataFrame:
     """Операционные поступления, списания и свободный поток по каждому месяцу."""
     flows = monthly[["application_id", "month"]].copy()
-    flows["operational_in"] = monthly[OPERATIONAL_INFLOWS].sum(axis=1)
-    flows["operational_out"] = monthly[OPERATIONAL_OUTFLOWS].sum(axis=1)
+    # Пустая выборка из базы (клиент не из Альфы) приходит с колонками object — приводим к числам.
+    flows["operational_in"] = monthly[OPERATIONAL_INFLOWS].astype(float).sum(axis=1)
+    flows["operational_out"] = monthly[OPERATIONAL_OUTFLOWS].astype(float).sum(axis=1)
     flows["free_cash_flow"] = flows["operational_in"] - flows["operational_out"]
     return flows
 
@@ -69,5 +70,5 @@ def top_customer_share(monthly: pd.DataFrame) -> pd.Series:
     """Доля крупнейшего покупателя в операционных поступлениях за весь период выписок."""
     flows = monthly_cash_flow(monthly)
     total = flows.groupby("application_id")["operational_in"].sum()
-    top = monthly.groupby("application_id")["top_customer_inflow"].sum()
+    top = monthly["top_customer_inflow"].astype(float).groupby(monthly["application_id"]).sum()
     return (top / total.where(total > 0)).clip(upper=1.0)

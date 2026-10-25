@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 from sqlalchemy import Date, Engine, Integer, Table, create_engine
+from sqlalchemy.pool import NullPool
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.schema import CreateIndex, CreateTable, SetTableComment
 
@@ -12,8 +13,12 @@ from alfa_ml.sources.schema import TURNOVER_COLUMNS, metadata
 
 
 def sqlite_engine(path: Path) -> Engine:
-    """SQLite через SQLAlchemy. Путь передаётся напрямую, а не в URL: в нём может быть кириллица."""
-    return create_engine("sqlite://", creator=lambda: sqlite3.connect(path))
+    """SQLite через SQLAlchemy. Путь передаётся напрямую, а не в URL: в нём может быть кириллица.
+
+    Без пула: сервис обрабатывает запросы в разных потоках, а соединение SQLite нельзя закрыть
+    из чужого потока. Открыть файл заново на каждый запрос — дёшево.
+    """
+    return create_engine("sqlite://", creator=lambda: sqlite3.connect(path), poolclass=NullPool)
 
 
 def source_tables(batch) -> dict[str, pd.DataFrame]:

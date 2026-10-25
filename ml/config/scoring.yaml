@@ -12,7 +12,11 @@ rate_buckets:
   - {max_pd: 0.15, rate: 0.24}
 terms_months: [6, 12, 18, 24, 30, 36]
 min_amount: 100000
+max_amount: 30000000
 amount_step: 50000
+product: no_collateral
+# Ключи цели кредита, как на бэкенде. На решение влияет только refinancing.
+purposes: [real_estate, equipment, repair, working_capital, current_expenses, refinancing]
 max_offers: 2
 offer_validity_days: 10
 
