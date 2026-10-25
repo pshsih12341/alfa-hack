@@ -1,17 +1,24 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import config, database, routers
+from . import config
+from .routers import admin, applications, users
 
-app = FastAPI(title="Кредитный кабинет для СМИ", version="0.1.0")
+app = FastAPI(title="Credit Kiosk API")
 
-# CORS — для отдельно запускаемого фронтенда.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=config.settings.CORS_ORIGINS,
+    allow_origins=[o.strip() for o in config.settings.CORS_ORIGINS.split(",") if o.strip()],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.include_router(routers.users.router)
+app.include_router(users.router)
+app.include_router(applications.router)
+app.include_router(admin.router)
+
+
+@app.get("/", include_in_schema=False)
+def root():
+    return {"detail": "API only. See /docs"}

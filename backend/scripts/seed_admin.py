@@ -1,56 +1,47 @@
-#!/usr/bin/env python3
-"""Скрипт: ручное создание администратора в БД.
+"""Создать админа по номеру телефона."""
 
-Использование:
-    python3 scripts/seed_admin.py +790****0000
-Если номер не задан, берётся +790****0000.
-"""
-import os
 import sys
-from datetime import datetime
-from uuid import uuid4
+import uuid
+from pathlib import Path
 
-# путь к корню проекта, чтобы импортировать backend.app.*
-_HERE = os.path.dirname(os.path.abspath(__file__))
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(_HERE)))
-if _PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, _PROJECT_ROOT)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
-from sqlalchemy import select
-
-from backend.app.config import settings
-from backend.app.database import Base, SessionLocal, engine
-from backend.app.models import User
-
-DEFAULT_ADMIN_PHONE = "+790****0000"
+from app.database import SessionLocal  # noqa: E402
+from app.models import User  # noqa: E402
 
 
-def main():
-    phone = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_ADMIN_PHONE
-    Base.metadata.create_all(bind=engine)
-    db = SessionLocal()
-    try:
-        existing = db.execute(
-            select(User).where(User.phone_number == phone)
-        ).scalar_one_or_none()
-        if existing:
-            print(f"Админ уже есть: {phone} (id={existing.id}, is_admin={existing.is_admin})")
+def normalize(phone: str) -> str:
+    digits = "".join(c for c in phone if c.isdigit())
+    if len(digits) == 11 and digits[0] in ("7", "8"):
+        digits = "7" + digits[1:]
+    elif len(digits) == 10:
+        digits = "7" + digits
+    return "+" + digits
+
+
+def main() -> None:
+    phone = sys.argv[1] if len(sys.argv) > 1 else "+79000000000"
+    phone = normalize(phone)
+
+    with SessionLocal() as db:
+        existing = db.query(User).filter(User.phone_number == phone).first()
+        if existing is not None:
+            existing.is_admin = True
+            db.commit()
+            print(f"Пользователь {phone} уже существует — сделан админом")
             return
-        admin = User(
-            id=str(uuid4()),
+        user = User(
+            id=str(uuid.uuid4()),
             phone_number=phone,
-            credit_sum=0,
-            purpose="",
-            income=0,
             inn="",
             is_admin=True,
-            created_at=datetime.now(),
+            company_name="Администратор",
         )
-        db.add(admin)
+        db.add(user)
         db.commit()
-        print(f"Админ создан: id={admin.id}, phone={admin.phone_number}, is_admin=True")
-    finally:
-        db.close()
+        print(f"Создан админ {phone} (id={user.id})")
 
 
 if __name__ == "__main__":
