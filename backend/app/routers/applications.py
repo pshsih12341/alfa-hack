@@ -127,9 +127,11 @@ def get_application(
 
         products = None
         if application.status == "SUCCESS":
-            product_rows = db.execute(select(models.Product)).scalars().all()
-            products = [_product_to_info(p) for p in product_rows]
-
+            # Возвращаем только выбранный product_id. Legacy collateral
+            # (для старых заявок) в выдачу не попадает.
+            if application.product_id is not None:
+                selected = db.get(models.Product, application.product_id)
+                products = [_product_to_info(selected)] if selected else None
         return ApplicationDetails(
             id=str(application.id),
             number=application.number,

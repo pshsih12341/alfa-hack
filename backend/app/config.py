@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     # Redis для сессий и кэша (stage 2). Для SQLite не нужен, но оставляем
     # единое место, чтобы не размазывать конфиг.
     REDIS_URL: str = "redis://localhost:6379/0"
+    # Скоринг: mock (детерминированная заглушка) или ml (HTTP в ML-сервис).
+    SCORING_MODE: Literal["mock", "ml"] = "mock"
+    SCORING_URL: str = "http://ml:8001"
+    SCORING_TIMEOUT_SECONDS: float = 5.0
 
     COOKIE_NAME: str = "ck_session"
     COOKIE_MAX_AGE: int = 60 * 60 * 24 * 30  # 30 дней
