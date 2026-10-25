@@ -78,7 +78,7 @@ class ApplicationCreateRequest(BaseModel):
 class LimitRange(BaseModel):
     min: int
     max: int
-
+    step: int | None = None
 
 class TermLimit(BaseModel):
     min: int
