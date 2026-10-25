@@ -233,7 +233,10 @@ def accept(
 
         application.amount = payload.amount
         application.term_months = payload.termMonths
-        application.rate = product.rate
+        application.amount = payload.amount
+        application.term_months = payload.termMonths
+        if application.rate is None:
+            application.rate = product.rate  # fallback, если ML не дал rate
         application.bank_name = payload.bankName
         application.bic = payload.bic
         application.account_number = payload.accountNumber
