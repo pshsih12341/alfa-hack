@@ -1,17 +1,15 @@
 import uuid
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from ..scoring import run_scoring
+from sqlalchemy import select
 
 from .. import models
 from ..auth import get_current_user
-from ..database import SessionLocal
+from ..database import SessionLocal, utcnow
+from ..scoring import run_scoring
 from ..schemas import (
-    ALLOWED_PURPOSES,
-    ALLOWED_TERM_MONTHS,
+    CREDIT_SUM_MIN,
     AcceptOfferRequest,
     AcceptRequest,
     AcceptResponse,
@@ -27,6 +25,8 @@ from ..schemas import (
     ProductInfo,
     TermLimit,
 )
+from ..validation import validate_application
+
 router = APIRouter(prefix="/api/applications", tags=["applications"])
 
 
@@ -67,6 +67,24 @@ def _get_owned(db, application_id: str, user: models.User) -> models.Application
     return application
 
 
+def _product_by_code(db, code: str | None) -> models.Product | None:
+    if not code:
+        return None
+    return db.execute(
+        select(models.Product).where(models.Product.code == code)
+    ).scalar_one_or_none()
+
+
+def _public_info(info: dict | None) -> dict | None:
+    """additionalInfo для клиента: без содержимого файлов выписок."""
+    if not info:
+        return None
+    return {
+        "useAlfaAccount": bool(info.get("useAlfaAccount")),
+        "statements": [{"fileName": s.get("fileName")} for s in info.get("statements") or []],
+    }
+
+
 @router.get("", response_model=ApplicationListResponse)
 def list_applications(user: models.User = Depends(get_current_user)):
     with SessionLocal() as db:
@@ -81,19 +99,28 @@ def list_applications(user: models.User = Depends(get_current_user)):
         )
     return ApplicationListResponse(items=[_short(a) for a in rows])
 
+
 @router.post("", response_model=ApplicationShort, status_code=201)
 def create_application(
     payload: ApplicationCreateRequest,
     background: BackgroundTasks,
     user: models.User = Depends(get_current_user),
-
 ):
-    if payload.purpose not in ALLOWED_PURPOSES:
-        raise HTTPException(status_code=400, detail="Недопустимая цель кредита")
-    if payload.termMonths not in ALLOWED_TERM_MONTHS:
-        raise HTTPException(status_code=400, detail="Недопустимый срок кредита")
+    validate_application(payload.creditSum, payload.purpose, payload.termMonths, payload.refinanceLoanIds)
 
     with SessionLocal() as db:
+        # Согласие на БКИ: из запроса, а если его нет — из прошлых заявок клиента (дано при регистрации).
+        consent = payload.bkiConsent
+        if consent is None:
+            consent = db.execute(
+                select(models.Application.bki_consent)
+                .where(models.Application.client_id == user.id)
+                .where(models.Application.bki_consent.is_(True))
+                .limit(1)
+            ).scalar_one_or_none()
+        if not consent:
+            raise HTTPException(status_code=400, detail="Требуется согласие на запрос в БКИ")
+
         last_number = db.execute(
             select(models.Application.number)
             .where(models.Application.client_id == user.id)
@@ -110,6 +137,10 @@ def create_application(
             purpose=payload.purpose,
             requested_term_months=payload.termMonths,
             has_collateral=payload.hasCollateral,
+            revenue_last_12m=payload.revenueLast12m or None,  # 0 — выручка не указана
+            bki_consent=True,
+            bki_consent_at=utcnow(),
+            refinance_loan_ids=payload.refinanceLoanIds,
         )
         db.add(application)
         db.flush()
@@ -126,6 +157,7 @@ def create_application(
     background.add_task(run_scoring, application_id)
     return result
 
+
 @router.get("/{application_id}", response_model=ApplicationDetails)
 def get_application(
     application_id: str,
@@ -133,51 +165,44 @@ def get_application(
 ):
     with SessionLocal() as db:
         application = _get_owned(db, application_id, user)
+        status = application.status
+        sr = application.scoring_response or {}
 
         products = None
-        if application.status == "SUCCESS":
-            if application.product_id is not None:
-                selected = db.get(models.Product, application.product_id)
-                products = [_product_to_info(selected)] if selected else None
+        if status == "SUCCESS" and application.product_id is not None:
+            selected = db.get(models.Product, application.product_id)
+            products = [_product_to_info(selected)] if selected else None
 
-        offers = None
-        max_by_term = None
-        limit_range = None
-        term_limit_range = None
-        client_message = None
-        if application.status == "OFFER" and application.scoring_response:
-            sr = application.scoring_response
-            if sr.get("offers"):
-                offers = [OfferInfo(**o) for o in sr["offers"]]
-            if sr.get("maxByTerm"):
-                max_by_term = [MaxByTermItem(**m) for m in sr["maxByTerm"]]
-            if sr.get("limit"):
-                limit_range = LimitRange(**sr["limit"])
-            if sr.get("termLimit"):
-                term_limit_range = TermLimit(**sr["termLimit"])
-            client_message = sr.get("clientMessage")
+        # Условия из ответа ML: одобренные (SUCCESS), варианты (OFFER), максимум по срокам и лимиты (оба).
+        with_terms = status in ("SUCCESS", "OFFER")
+        approved = OfferInfo(**sr["approved"]) if status == "SUCCESS" and sr.get("approved") else None
+        offers = [OfferInfo(**o) for o in sr.get("offers") or []] if status == "OFFER" else []
+        max_by_term = [MaxByTermItem(**m) for m in sr.get("maxByTerm") or []] if with_terms else []
 
         return ApplicationDetails(
             id=str(application.id),
             number=application.number,
             clientId=application.client_id,
-            status=application.status,
+            status=status,
             creditSum=application.credit_sum,
             purpose=application.purpose,
             createdAt=application.created_at,
             updatedAt=application.updated_at,
             products=products,
-            additionalInfo=application.additional_info,
+            additionalInfo=_public_info(application.additional_info),
             amount=application.amount,
             termMonths=application.term_months,
             rate=application.rate,
             approvedLimit=application.approved_limit,
-            offers=offers,
-            maxByTerm=max_by_term,
-            limit=limit_range,
-            termLimit=term_limit_range,
-            clientMessage=client_message,
+            approved=approved,
+            offers=offers or None,
+            maxByTerm=max_by_term or None,
+            limit=LimitRange(**sr["limit"]) if with_terms and sr.get("limit") else None,
+            termLimit=TermLimit(**sr["termLimit"]) if with_terms and sr.get("termLimit") else None,
+            clientMessage=sr.get("clientMessage") if status in ("SUCCESS", "OFFER", "INFO", "REJECTED") else None,
+            documentsRequired=sr.get("documentsRequired") if status in ("INFO", "OFFER") else None,
         )
+
 
 @router.post(
     "/{application_id}/additional-info",
@@ -186,14 +211,24 @@ def get_application(
 def submit_additional_info(
     application_id: str,
     payload: AdditionalInfoRequest,
+    background: BackgroundTasks,
     user: models.User = Depends(get_current_user),
 ):
+    """Этап 2: обороты по счёту в Альфе и/или выписки файлами — заявка уходит на повторный скоринг."""
+    if not payload.useAlfaAccount and not payload.statements:
+        raise HTTPException(
+            status_code=400,
+            detail="Разрешите использовать данные счёта в Альфе или загрузите выписки",
+        )
     with SessionLocal() as db:
         application = _get_owned(db, application_id, user)
-        if application.status != "INFO":
-            raise HTTPException(status_code=400, detail="Статус не INFO")
+        if application.status not in ("INFO", "OFFER"):
+            raise HTTPException(status_code=400, detail="Выписки принимаются только для заявок в статусе INFO или OFFER")
 
-        application.additional_info = payload.model_dump()
+        application.additional_info = {
+            "useAlfaAccount": payload.useAlfaAccount,
+            "statements": [s.model_dump() for s in payload.statements],
+        }
         application.status = "PRESCORING"
         db.add(
             models.ApplicationStatusHistory(
@@ -202,11 +237,14 @@ def submit_additional_info(
         )
         db.commit()
         db.refresh(application)
-        return AdditionalInfoResponse(
+        response = AdditionalInfoResponse(
             id=str(application.id),
             status=application.status,
             updatedAt=application.updated_at,
         )
+
+    background.add_task(run_scoring, application_id)
+    return response
 
 
 @router.post("/{application_id}/accept", response_model=AcceptResponse)
@@ -219,26 +257,40 @@ def accept(
         application = _get_owned(db, application_id, user)
         if application.status != "SUCCESS":
             raise HTTPException(status_code=409, detail="Статус не SUCCESS")
-        if application.product_id is None:
-            raise HTTPException(status_code=409, detail="Продукт не выбран")
 
-        product = db.get(models.Product, application.product_id)
-        if product is None:
-            raise HTTPException(status_code=409, detail="Продукт не найден")
-
-        if not (product.limit_min <= payload.amount <= product.limit_max):
-            raise HTTPException(status_code=400, detail="Сумма вне лимита")
-        if not (product.term_min <= payload.termMonths <= product.term_max):
-            raise HTTPException(status_code=400, detail="Срок вне лимита")
-        if (payload.termMonths - product.term_min) % product.term_step != 0:
-            raise HTTPException(status_code=400, detail="Срок не кратен шагу")
+        sr = application.scoring_response or {}
+        if sr.get("maxByTerm"):
+            # Решение ML: сумма не больше одобренной на выбранный срок, ставка — этого срока.
+            item = next((m for m in sr["maxByTerm"] if m.get("termMonths") == payload.termMonths), None)
+            if item is None or item.get("maxSum") is None:
+                raise HTTPException(status_code=400, detail="На этот срок кредит не одобрен")
+            limit_min = (sr.get("limit") or {}).get("min", CREDIT_SUM_MIN)
+            if not limit_min <= payload.amount <= item["maxSum"]:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"На {payload.termMonths} мес. можно взять от {limit_min} до {item['maxSum']} ₽",
+                )
+            approved = sr.get("approved") or {}
+            same = approved.get("creditSum") == payload.amount and approved.get("termMonths") == payload.termMonths
+            application.rate = float(approved["rate"] if same else item["rate"])
+        else:
+            # Без ответа ML (mock-скоринг) — лимиты продукта.
+            if application.product_id is None:
+                raise HTTPException(status_code=409, detail="Продукт не выбран")
+            product = db.get(models.Product, application.product_id)
+            if product is None:
+                raise HTTPException(status_code=409, detail="Продукт не найден")
+            if not (product.limit_min <= payload.amount <= product.limit_max):
+                raise HTTPException(status_code=400, detail="Сумма вне лимита")
+            if not (product.term_min <= payload.termMonths <= product.term_max):
+                raise HTTPException(status_code=400, detail="Срок вне лимита")
+            if (payload.termMonths - product.term_min) % product.term_step != 0:
+                raise HTTPException(status_code=400, detail="Срок не кратен шагу")
+            if application.rate is None:
+                application.rate = product.rate  # fallback, если ML не дал rate
 
         application.amount = payload.amount
         application.term_months = payload.termMonths
-        application.amount = payload.amount
-        application.term_months = payload.termMonths
-        if application.rate is None:
-            application.rate = product.rate  # fallback, если ML не дал rate
         application.bank_name = payload.bankName
         application.bic = payload.bic
         application.account_number = payload.accountNumber
@@ -271,6 +323,7 @@ def accept(
             updatedAt=application.updated_at,
         )
 
+
 @router.post("/{application_id}/accept-offer", response_model=AcceptResponse)
 def accept_offer(
     application_id: str,
@@ -287,6 +340,7 @@ def accept_offer(
         sr = application.scoring_response
         offers = sr.get("offers") or []
         max_by_term = sr.get("maxByTerm") or []
+        limit_min = (sr.get("limit") or {}).get("min", CREDIT_SUM_MIN)
 
         chosen = None
         for o in offers:
@@ -298,10 +352,12 @@ def accept_offer(
                 break
 
         if chosen is None:
+            # Своя сумма с ползунка: не больше максимума на этот срок; срок с maxSum = null недоступен.
             for m in max_by_term:
                 if (
                     m.get("termMonths") == payload.termMonths
-                    and payload.creditSum <= m.get("maxSum", 0)
+                    and m.get("maxSum") is not None
+                    and limit_min <= payload.creditSum <= m["maxSum"]
                 ):
                     chosen = m
                     break
@@ -313,6 +369,9 @@ def accept_offer(
 
         rate = float(chosen.get("rate", 0))
 
+        product = _product_by_code(db, sr.get("product"))
+        if product is not None:
+            application.product_id = product.id
         application.amount = payload.creditSum
         application.term_months = payload.termMonths
         application.rate = rate

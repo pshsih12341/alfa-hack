@@ -16,6 +16,13 @@ ALLOWED_PURPOSES = {
 
 ALLOWED_TERM_MONTHS = {6, 12, 18, 24, 30, 36}
 
+# Лимиты суммы — как в ML-сервисе (ml/config/scoring.yaml): вне их ML отвечает 422.
+CREDIT_SUM_MIN = 100_000
+CREDIT_SUM_MAX = 30_000_000
+
+# Выписки этапа 2 — как в ML-сервисе: не больше 5 файлов.
+MAX_STATEMENT_FILES = 5
+
 
 # ---------- Auth ----------
 
@@ -76,6 +83,10 @@ class ApplicationCreateRequest(BaseModel):
     purpose: str
     termMonths: int
     hasCollateral: bool = False
+    revenueLast12m: int | None = Field(default=None, ge=0)
+    # None — взять согласие из прошлой заявки клиента (дано при регистрации).
+    bkiConsent: bool | None = None
+    refinanceLoanIds: list[int] = Field(default_factory=list)
 
 
 class LimitRange(BaseModel):
@@ -108,9 +119,10 @@ class OfferInfo(BaseModel):
 
 class MaxByTermItem(BaseModel):
     termMonths: int
-    maxSum: int
-    rate: float
-    monthlyPayment: int
+    # None — на этом сроке не проходит даже минимальная сумма: срок недоступен.
+    maxSum: int | None = None
+    rate: float | None = None
+    monthlyPayment: int | None = None
 
 
 class ApplicationDetails(BaseModel):
@@ -128,18 +140,25 @@ class ApplicationDetails(BaseModel):
     termMonths: int | None = None
     rate: float | None = None
     approvedLimit: int | None = None
+    approved: OfferInfo | None = None  # SUCCESS: одобренные условия
     offers: list[OfferInfo] | None = None
     maxByTerm: list[MaxByTermItem] | None = None
     limit: LimitRange | None = None
     termLimit: TermLimit | None = None
     clientMessage: str | None = None
+    # INFO и OFFER: что нужно для этапа 2 — alfaAccountConsent (счёт в Альфе) или bankStatements (файлы 1С).
+    documentsRequired: list[str] | None = None
+
+
+class StatementFile(BaseModel):
+    fileName: str
+    content: str  # base64 выгрузки 1С
 
 
 class AdditionalInfoRequest(BaseModel):
-    actualAddress: str
-    employeesCount: int
-    website: str
-    activityDescription: str
+    """Этап 2: обороты по счёту в Альфе и/или выписки других банков файлами."""
+    useAlfaAccount: bool = False
+    statements: list[StatementFile] = Field(default_factory=list, max_length=MAX_STATEMENT_FILES)
 
 
 class AdditionalInfoResponse(BaseModel):

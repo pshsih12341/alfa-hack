@@ -9,12 +9,11 @@ from ..auth import _set_auth_cookie, create_session, get_current_user, get_sessi
 from ..database import SessionLocal, utcnow
 from ..scoring import run_scoring
 from ..schemas import (
-    ALLOWED_PURPOSES,
-    ALLOWED_TERM_MONTHS,
     LoginRequest,
     RegisterRequest,
     UserResponse,
 )
+from ..validation import is_valid_inn, validate_application
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -30,14 +29,9 @@ def _normalize_phone(phone: str) -> str:
 
 @router.post("/reg", status_code=201)
 def register(payload: RegisterRequest, background: BackgroundTasks):
-    if payload.purpose not in ALLOWED_PURPOSES:
-        raise HTTPException(status_code=400, detail="Недопустимая цель кредита")
-    if not payload.bkiConsent:
-        raise HTTPException(status_code=400, detail="Требуется согласие на запрос в БКИ")
-    if payload.purpose not in ALLOWED_PURPOSES:
-        raise HTTPException(status_code=400, detail="Недопустимая цель кредита")
-    if payload.termMonths not in ALLOWED_TERM_MONTHS:
-        raise HTTPException(status_code=400, detail="Недопустимый срок кредита")
+    validate_application(payload.creditSum, payload.purpose, payload.termMonths, payload.refinanceLoanIds)
+    if not is_valid_inn(payload.inn):
+        raise HTTPException(status_code=400, detail="Некорректный ИНН: нужно 10 или 12 цифр с верными контрольными")
     if not payload.bkiConsent:
         raise HTTPException(status_code=400, detail="Требуется согласие на запрос в БКИ")
 
@@ -68,7 +62,7 @@ def register(payload: RegisterRequest, background: BackgroundTasks):
             has_collateral=payload.hasCollateral,
             purpose=payload.purpose,
             requested_term_months=payload.termMonths, 
-            revenue_last_12m=payload.revenueLast12m,
+            revenue_last_12m=payload.revenueLast12m or None,  # 0 — выручка не указана
             bki_consent=payload.bkiConsent,
             bki_consent_at=utcnow(),
             refinance_loan_ids=payload.refinanceLoanIds,

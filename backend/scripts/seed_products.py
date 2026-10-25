@@ -15,23 +15,37 @@ from app.models import Product  # noqa: E402
 
 
 COMMON_PURPOSES = [
+    "Покупка недвижимости",
     "Покупка имущества",
     "Покупка оборудования",
     "Ремонт",
     "Текущие расходы",
     "Пополнение оборотных средств",
+    "Рефинансирование",
 ]
 
 
 def _load_products() -> list[Product]:
+    # ML выбирает продукт по hasCollateral (no_collateral или collateral), оба должны быть в БД.
+    # Лимиты — как в ML (ml/config/scoring.yaml); rate — минимальная ставка продукта,
+    # фактическую ставку заявки даёт ML.
     return [
+        Product(
+            code="no_collateral",
+            product_name="Кредит для бизнеса без залога",
+            purpose=COMMON_PURPOSES,
+            rate=18,
+            limit_min=100_000, limit_max=30_000_000,
+            term_min=6, term_max=36, term_step=6,
+            business_type="LLC", with_collateral=False,
+        ),
         Product(
             code="collateral",
             product_name="Кредит для бизнеса под залог",
             purpose=COMMON_PURPOSES,
-            rate=18, 
-            limit_min=100_000, limit_max=100_000_000,
-            term_min=6, term_max=60, term_step=6,
+            rate=17.5,
+            limit_min=100_000, limit_max=30_000_000,
+            term_min=6, term_max=36, term_step=6,
             business_type="LLC", with_collateral=True,
         ),
     ]

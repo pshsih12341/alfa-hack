@@ -118,11 +118,11 @@ def get_application(
         
         if product_name is None and sr.get("product"):
             p_code = sr.get("product")
-            # ML отдает код no_collateral, мапим на красивое имя
-            if p_code == "no_collateral":
-                product_name = "Кредит для бизнеса без залога"
-            else:
-                product_name = str(p_code)
+            # ML отдает код продукта (no_collateral или collateral) — берём имя из таблицы продуктов
+            by_code = db.execute(
+                select(models.Product).where(models.Product.code == p_code)
+            ).scalar_one_or_none()
+            product_name = by_code.product_name if by_code else str(p_code)
                 
         if product_rate is None and sr.get("rate"):
             product_rate = float(sr["rate"])
