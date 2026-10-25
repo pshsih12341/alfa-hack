@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { AmountInput } from '@alfalab/core-components-amount-input'
 import { Button } from '@alfalab/core-components-button'
 import { Input } from '@alfalab/core-components-input'
 import { Modal } from '@alfalab/core-components-modal'
 import Logo from '../components/Logo'
 import ApplicationsList from './cabinet/ApplicationsList'
 import PersonalData from './cabinet/PersonalData'
+import { approvedProductMock } from '../mocks/approvedProduct'
 import './CabinetPage.css'
 
 const statusLabels = {
@@ -14,32 +16,24 @@ const statusLabels = {
   REJECTED: 'Отклонено',
 }
 
-const creditOffers = [
-  {
-    id: 1,
-    title: 'Лучшее предложение',
-    amount: '5 000 000 ₽',
-    rate: '17,9%',
-    term: '36 месяцев',
-    payment: '178 450 ₽',
-  },
-  {
-    id: 2,
-    title: 'Низкий ежемесячный платёж',
-    amount: '5 000 000 ₽',
-    rate: '19,4%',
-    term: '48 месяцев',
-    payment: '149 780 ₽',
-  },
-  {
-    id: 3,
-    title: 'Быстрое погашение',
-    amount: '5 000 000 ₽',
-    rate: '20,1%',
-    term: '24 месяца',
-    payment: '254 320 ₽',
-  },
-]
+const calculatorTerm = {
+  min: 6,
+  max: 60,
+  step: 6,
+}
+
+const formatMoney = (value) =>
+  `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 }).format(value)} ₽`
+
+const calculateMonthlyPayment = (amount, annualRate, months) => {
+  if (!amount || !months) return 0
+  if (!annualRate) return Math.round(amount / months)
+
+  const monthlyRate = annualRate / 100 / 12
+  const factor = (1 + monthlyRate) ** months
+
+  return Math.round((amount * monthlyRate * factor) / (factor - 1))
+}
 
 function CabinetPage({ userData, applications, onAddApplication, onLogout }) {
   const [view, setView] = useState('applications')
@@ -132,6 +126,7 @@ function CabinetPage({ userData, applications, onAddApplication, onLogout }) {
             </div>
 
             <ApplicationStatus
+              application={activeApplication}
               status={activeApplication?.status || 'PRESCORING'}
               onOpenProfile={openRequestedData}
             />
@@ -159,13 +154,13 @@ function CabinetPage({ userData, applications, onAddApplication, onLogout }) {
   )
 }
 
-function ApplicationStatus({ status, onOpenProfile }) {
+function ApplicationStatus({ application, status, onOpenProfile }) {
   if (status === 'INFO') {
     return <InfoRequiredStatus onOpenProfile={onOpenProfile} />
   }
 
   if (status === 'SUCCESS') {
-    return <ApprovedStatus />
+    return <ApprovedStatus application={application} />
   }
 
   if (status === 'REJECTED') {
@@ -202,19 +197,40 @@ function InfoRequiredStatus({ onOpenProfile }) {
   )
 }
 
-function ApprovedStatus() {
-  const [selectedOffer, setSelectedOffer] = useState(null)
+function ApprovedStatus({ application }) {
+  const product = approvedProductMock
+  const requestedAmount = application?.creditSum
+    ? application.creditSum / 100
+    : product.limit.min
+  const initialAmount = Math.min(
+    product.limit.max,
+    Math.max(product.limit.min, requestedAmount),
+  )
+  const [amount, setAmount] = useState(initialAmount)
+  const [term, setTerm] = useState(36)
+  const [offerModalOpen, setOfferModalOpen] = useState(false)
   const [detailsSent, setDetailsSent] = useState(false)
   const [details, setDetails] = useState({ bankName: '', bic: '', accountNumber: '' })
   const detailsComplete = Object.values(details).every(Boolean)
+  const rateLabel =
+    product.rate === null ? 'Индивидуальная ставка' : `${product.rate}% годовых`
+  const amountValid = amount >= product.limit.min && amount <= product.limit.max
+  const monthlyPayment = calculateMonthlyPayment(amount, product.rate, term)
+  const totalPayment = monthlyPayment * term
+  const overpayment = Math.max(0, totalPayment - amount)
+  const amountProgress = amountValid
+    ? ((amount - product.limit.min) / (product.limit.max - product.limit.min)) * 100
+    : 0
+  const termProgress =
+    ((term - calculatorTerm.min) / (calculatorTerm.max - calculatorTerm.min)) * 100
 
-  const openOffer = (offer) => {
-    setSelectedOffer(offer)
+  const openOffer = () => {
+    setOfferModalOpen(true)
     setDetailsSent(false)
   }
 
   const closeOffer = () => {
-    setSelectedOffer(null)
+    setOfferModalOpen(false)
     setDetails({ bankName: '', bic: '', accountNumber: '' })
   }
 
@@ -229,64 +245,115 @@ function ApprovedStatus() {
 
   return (
     <>
-      <section className="offers-panel">
-        <div className="offers-header">
-          <div>
-            <div className="offers-header__caption">Заявка одобрена</div>
-            <h1>Выберите подходящие условия</h1>
-            <p>
-              Мы проанализировали предложения и расположили самые выгодные выше.
-            </p>
+      <section className="credit-calculator">
+        <header className="credit-calculator__header">
+          <div className="credit-calculator__approved">Заявка одобрена</div>
+          <h1>{product.product}</h1>
+          <p>
+            Вам доступно до {formatMoney(product.limit.max)}. Выберите нужную
+            сумму и удобный срок кредита.
+          </p>
+          <div className="credit-calculator__tags">
+            <span>{rateLabel}</span>
+            <span>{product.withCollateral ? 'С залогом' : 'Без залога'}</span>
           </div>
-          <div className="offers-header__count">3 предложения</div>
-        </div>
+        </header>
 
-        <div className="credit-offers">
-          {creditOffers.map((offer, index) => (
-            <article
-              className={index === 0 ? 'credit-offer credit-offer_best' : 'credit-offer'}
-              key={offer.id}
-            >
-              <div className="credit-offer__top">
-                <span className="credit-offer__rank">{index + 1}</span>
-                <span className="credit-offer__title">{offer.title}</span>
-                {index === 0 && <span className="credit-offer__badge">Лучший выбор</span>}
-              </div>
-
-              <div className="credit-offer__amount">{offer.amount}</div>
-              <div className="credit-offer__amount-label">сумма кредита</div>
-
-              <dl className="credit-offer__terms">
-                <div>
-                  <dt>Ставка</dt>
-                  <dd>{offer.rate}</dd>
-                </div>
-                <div>
-                  <dt>Срок</dt>
-                  <dd>{offer.term}</dd>
-                </div>
-                <div>
-                  <dt>Платёж в месяц</dt>
-                  <dd>{offer.payment}</dd>
-                </div>
-              </dl>
-
-              <Button
-                type="button"
-                view={index === 0 ? 'accent' : 'secondary'}
-                size={48}
+        <div className="credit-calculator__body">
+          <div className="credit-calculator__controls">
+            <div className="calculator-field">
+              <AmountInput
                 block
-                onClick={() => openOffer(offer)}
-              >
-                Выбрать предложение
-              </Button>
-            </article>
-          ))}
+                size={64}
+                label="Сумма кредита"
+                value={amount === null ? null : amount * 100}
+                onChange={(_, { value }) =>
+                  setAmount(value === null ? null : value / 100)
+                }
+                currency="RUR"
+                integersOnly
+                error={
+                  amount !== null && !amountValid
+                    ? `Введите сумму от ${formatMoney(product.limit.min)} до ${formatMoney(product.limit.max)}`
+                    : false
+                }
+              />
+              <input
+                className="calculator-range"
+                type="range"
+                min={product.limit.min}
+                max={product.limit.max}
+                step={100_000}
+                value={amountValid ? amount : product.limit.min}
+                style={{ '--range-progress': `${amountProgress}%` }}
+                onChange={(event) => setAmount(Number(event.target.value))}
+              />
+              <div className="calculator-range-labels">
+                <span>{formatMoney(product.limit.min)}</span>
+                <span>{formatMoney(product.limit.max)}</span>
+              </div>
+            </div>
+
+            <div className="calculator-field">
+              <div className="calculator-field__heading">
+                <span>Срок кредита</span>
+                <strong>{term} месяцев</strong>
+              </div>
+              <input
+                className="calculator-range"
+                type="range"
+                min={calculatorTerm.min}
+                max={calculatorTerm.max}
+                step={calculatorTerm.step}
+                value={term}
+                style={{ '--range-progress': `${termProgress}%` }}
+                onChange={(event) => setTerm(Number(event.target.value))}
+              />
+              <div className="calculator-range-labels">
+                <span>{calculatorTerm.min} месяцев</span>
+                <span>{calculatorTerm.max} месяцев</span>
+              </div>
+            </div>
+          </div>
+
+          <aside className="credit-calculator__result">
+            <span>Платёж в месяц</span>
+            <strong>{amountValid ? formatMoney(monthlyPayment) : '—'}</strong>
+            <dl>
+              <div>
+                <dt>Сумма</dt>
+                <dd>{amountValid ? formatMoney(amount) : '—'}</dd>
+              </div>
+              <div>
+                <dt>Срок</dt>
+                <dd>{term} месяцев</dd>
+              </div>
+              <div>
+                <dt>Ставка</dt>
+                <dd>{product.rate === null ? 'Индивидуально' : `${product.rate}%`}</dd>
+              </div>
+              <div>
+                <dt>Переплата</dt>
+                <dd>{amountValid ? formatMoney(overpayment) : '—'}</dd>
+              </div>
+            </dl>
+            <Button
+              type="button"
+              view="accent"
+              size={56}
+              block
+              disabled={!amountValid}
+              onClick={openOffer}
+            >
+              Продолжить оформление
+            </Button>
+            <small>Расчёт предварительный и не является офертой</small>
+          </aside>
         </div>
       </section>
 
       <Modal
-        open={Boolean(selectedOffer)}
+        open={offerModalOpen}
         onClose={closeOffer}
         size={600}
         hasCloser
@@ -317,10 +384,10 @@ function ApprovedStatus() {
               onSubmit={submitDetails}
             >
               <div className="offer-modal-summary">
-                <span>{selectedOffer?.title}</span>
-                <strong>{selectedOffer?.amount}</strong>
+                <span>{product.product}</span>
+                <strong>{formatMoney(amount)}</strong>
                 <small>
-                  {selectedOffer?.rate} · {selectedOffer?.term}
+                  {rateLabel} · {term} месяцев · {formatMoney(monthlyPayment)} в месяц
                 </small>
               </div>
 
@@ -384,6 +451,20 @@ function ApprovedStatus() {
 }
 
 function PrescoringStatus() {
+  const [secondsLeft, setSecondsLeft] = useState(120)
+
+  useEffect(() => {
+    const deadline = Date.now() + 120_000
+    const timer = window.setInterval(() => {
+      setSecondsLeft(Math.max(0, Math.ceil((deadline - Date.now()) / 1000)))
+    }, 1000)
+
+    return () => window.clearInterval(timer)
+  }, [])
+
+  const minutes = String(Math.floor(secondsLeft / 60)).padStart(2, '0')
+  const seconds = String(secondsLeft % 60).padStart(2, '0')
+
   return (
     <>
       <article className="application-status-card">
@@ -399,12 +480,28 @@ function PrescoringStatus() {
             Мы анализируем данные вашего бизнеса. Как только проверка
             завершится, здесь появятся лучшие кредитные предложения.
           </p>
+          <div className="prescoring-timer">
+            {secondsLeft > 0 ? (
+              <>
+                <span>Осталось примерно</span>
+                <strong>{minutes}:{seconds}</strong>
+              </>
+            ) : (
+              <>
+                <span>Завершаем проверку</span>
+                <strong>Ещё немного</strong>
+              </>
+            )}
+          </div>
         </div>
       </article>
 
       <div className="status-note">
         <span className="status-note__icon">i</span>
-        <p>Когда проверка завершится, её результат появится на этой странице.</p>
+        <p>
+          Обычно проверка занимает до двух минут. Иногда нам может понадобиться
+          немного больше времени.
+        </p>
       </div>
     </>
   )

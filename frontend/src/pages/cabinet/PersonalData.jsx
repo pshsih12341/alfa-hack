@@ -10,12 +10,6 @@ const initialExtraData = {
   activityDescription: '',
 }
 
-const formatAmount = (value) => {
-  if (!value) return '—'
-
-  return `${new Intl.NumberFormat('ru-RU').format(value / 100)} ₽`
-}
-
 function PersonalData({ data, status, shouldScrollToAdditionalData }) {
   const [extraData, setExtraData] = useState(initialExtraData)
   const [sent, setSent] = useState(false)
@@ -50,7 +44,6 @@ function PersonalData({ data, status, shouldScrollToAdditionalData }) {
         <dl className="personal-data-list">
           <DataRow label="Номер телефона" value={data.phoneNumber} />
           <DataRow label="ИНН" value={data.inn} />
-          <DataRow label="Среднемесячный доход" value={formatAmount(data.income)} />
         </dl>
       </section>
 

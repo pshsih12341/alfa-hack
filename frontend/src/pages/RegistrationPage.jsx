@@ -12,8 +12,6 @@ const initialForm = {
   phoneNumber: '',
   creditSum: null,
   purpose: '',
-  customPurpose: '',
-  income: null,
   inn: '',
 }
 
@@ -27,9 +25,7 @@ function RegistrationPage({ initialMode = 'registration', onAuthenticated }) {
           form.phoneNumber &&
             form.creditSum &&
             form.purpose &&
-            form.income &&
-            form.inn &&
-            (form.purpose !== 'other' || form.customPurpose),
+            form.inn,
         )
 
   const setField = (field, value) => {
@@ -44,13 +40,13 @@ function RegistrationPage({ initialMode = 'registration', onAuthenticated }) {
     event.preventDefault()
 
     if (mode === 'login') {
-      onAuthenticated({ phoneNumber: form.phoneNumber })
+      onAuthenticated({ phoneNumber: form.phoneNumber, isAdmin: true })
       return
     }
 
     onAuthenticated({
       ...form,
-      purpose: getCreditPurpose(form.purpose, form.customPurpose),
+      purpose: getCreditPurpose(form.purpose),
     })
   }
 
@@ -169,36 +165,7 @@ function RegistrationFields({ form, setField }) {
         placeholder="Выберите цель"
         options={creditPurposeOptions}
         selected={form.purpose || null}
-        onChange={({ selected }) => {
-          const purpose = selected?.key ?? ''
-          setField('purpose', purpose)
-
-          if (purpose !== 'other') {
-            setField('customPurpose', '')
-          }
-        }}
-      />
-
-      {form.purpose === 'other' && (
-        <Input
-          block
-          size={56}
-          label="Укажите цель кредита"
-          value={form.customPurpose}
-          onChange={(_, { value }) => setField('customPurpose', value)}
-          required
-        />
-      )}
-
-      <AmountInput
-        block
-        size={56}
-        label="Среднемесячный доход"
-        value={form.income}
-        onChange={(_, { value }) => setField('income', value)}
-        currency="RUR"
-        integersOnly
-        required
+        onChange={({ selected }) => setField('purpose', selected?.key ?? '')}
       />
 
       <Input

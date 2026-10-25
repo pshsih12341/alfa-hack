@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import AdminPage from './pages/AdminPage'
 import CabinetPage from './pages/CabinetPage'
 import RegistrationPage from './pages/RegistrationPage'
 
@@ -10,11 +11,18 @@ function App() {
 
   const handleAuthenticated = (data) => {
     setUserData(data)
+
+    if (data.isAdmin) {
+      setApplications([])
+      setPage('admin')
+      return
+    }
+
     setApplications([
       {
         id: `application-${Date.now()}`,
         number: 1,
-        status: 'INFO',
+        status: 'SUCCESS',
         creditSum: data.creditSum || 500_000_000,
         purpose: data.purpose || 'Пополнение оборотных средств',
       },
@@ -50,6 +58,10 @@ function App() {
         onLogout={handleLogout}
       />
     )
+  }
+
+  if (page === 'admin') {
+    return <AdminPage onLogout={handleLogout} />
   }
 
   return (

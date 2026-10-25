@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { AmountInput } from '@alfalab/core-components-amount-input'
 import { Button } from '@alfalab/core-components-button'
-import { Input } from '@alfalab/core-components-input'
 import { Modal } from '@alfalab/core-components-modal'
 import { Select } from '@alfalab/core-components-select'
 import { creditPurposeOptions, getCreditPurpose } from '../../data/creditPurposes'
@@ -17,7 +16,6 @@ const statusLabels = {
 const initialApplication = {
   creditSum: null,
   purpose: '',
-  customPurpose: '',
 }
 
 const formatAmount = (value) => {
@@ -28,11 +26,7 @@ const formatAmount = (value) => {
 function ApplicationsList({ applications, onOpen, onAdd }) {
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState(initialApplication)
-  const formComplete = Boolean(
-    form.creditSum &&
-      form.purpose &&
-      (form.purpose !== 'other' || form.customPurpose),
-  )
+  const formComplete = Boolean(form.creditSum && form.purpose)
 
   const setField = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }))
@@ -47,7 +41,7 @@ function ApplicationsList({ applications, onOpen, onAdd }) {
     event.preventDefault()
     onAdd({
       creditSum: form.creditSum,
-      purpose: getCreditPurpose(form.purpose, form.customPurpose),
+      purpose: getCreditPurpose(form.purpose),
     })
     closeModal()
   }
@@ -147,26 +141,8 @@ function ApplicationsList({ applications, onOpen, onAdd }) {
               placeholder="Выберите цель"
               options={creditPurposeOptions}
               selected={form.purpose || null}
-              onChange={({ selected }) => {
-                const purpose = selected?.key ?? ''
-                setField('purpose', purpose)
-                if (purpose !== 'other') setField('customPurpose', '')
-              }}
+              onChange={({ selected }) => setField('purpose', selected?.key ?? '')}
             />
-            {form.purpose === 'other' && (
-              <Input
-                block
-                size={56}
-                label={
-                  <>
-                    Укажите цель кредита <span className="new-application-required">*</span>
-                  </>
-                }
-                value={form.customPurpose}
-                onChange={(_, { value }) => setField('customPurpose', value)}
-                required
-              />
-            )}
           </form>
         </Modal.Content>
         <Modal.Footer layout="column">
