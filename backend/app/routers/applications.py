@@ -12,6 +12,7 @@ from ..database import SessionLocal
 from ..schemas import (
     ALLOWED_PURPOSES,
     ALLOWED_TERM_MONTHS,
+    AcceptOfferRequest,
     AcceptRequest,
     AcceptResponse,
     AdditionalInfoRequest,
@@ -21,10 +22,11 @@ from ..schemas import (
     ApplicationListResponse,
     ApplicationShort,
     LimitRange,
+    MaxByTermItem,
+    OfferInfo,
     ProductInfo,
     TermLimit,
 )
-
 router = APIRouter(prefix="/api/applications", tags=["applications"])
 
 
@@ -122,7 +124,6 @@ def create_application(
     background.add_task(run_scoring, application_id)
     return result
 
-
 @router.get("/{application_id}", response_model=ApplicationDetails)
 def get_application(
     application_id: str,
@@ -133,11 +134,27 @@ def get_application(
 
         products = None
         if application.status == "SUCCESS":
-            # Возвращаем только выбранный product_id. Legacy collateral
-            # (для старых заявок) в выдачу не попадает.
             if application.product_id is not None:
                 selected = db.get(models.Product, application.product_id)
                 products = [_product_to_info(selected)] if selected else None
+
+        offers = None
+        max_by_term = None
+        limit_range = None
+        term_limit_range = None
+        client_message = None
+        if application.status == "OFFER" and application.scoring_response:
+            sr = application.scoring_response
+            if sr.get("offers"):
+                offers = [OfferInfo(**o) for o in sr["offers"]]
+            if sr.get("maxByTerm"):
+                max_by_term = [MaxByTermItem(**m) for m in sr["maxByTerm"]]
+            if sr.get("limit"):
+                limit_range = LimitRange(**sr["limit"])
+            if sr.get("termLimit"):
+                term_limit_range = TermLimit(**sr["termLimit"])
+            client_message = sr.get("clientMessage")
+
         return ApplicationDetails(
             id=str(application.id),
             number=application.number,
@@ -153,8 +170,12 @@ def get_application(
             termMonths=application.term_months,
             rate=application.rate,
             approvedLimit=application.approved_limit,
+            offers=offers,
+            maxByTerm=max_by_term,
+            limit=limit_range,
+            termLimit=term_limit_range,
+            clientMessage=client_message,
         )
-
 
 @router.post(
     "/{application_id}/additional-info",
@@ -230,6 +251,83 @@ def accept(
                 number=str(application.number),
                 date=date.today(),
                 amount=payload.amount,
+                recipient=user.company_name or user.phone_number,
+                recipient_account=payload.accountNumber,
+            )
+        )
+        db.commit()
+        db.refresh(application)
+        return AcceptResponse(
+            id=str(application.id),
+            status=application.status,
+            amount=application.amount,
+            termMonths=application.term_months,
+            rate=float(application.rate),
+            updatedAt=application.updated_at,
+        )
+
+@router.post("/{application_id}/accept-offer", response_model=AcceptResponse)
+def accept_offer(
+    application_id: str,
+    payload: AcceptOfferRequest,
+    user: models.User = Depends(get_current_user),
+):
+    with SessionLocal() as db:
+        application = _get_owned(db, application_id, user)
+        if application.status != "OFFER":
+            raise HTTPException(status_code=409, detail="Статус не OFFER")
+        if not application.scoring_response:
+            raise HTTPException(status_code=409, detail="Нет данных предложения")
+
+        sr = application.scoring_response
+        offers = sr.get("offers") or []
+        max_by_term = sr.get("maxByTerm") or []
+
+        chosen = None
+        for o in offers:
+            if (
+                o.get("creditSum") == payload.creditSum
+                and o.get("termMonths") == payload.termMonths
+            ):
+                chosen = o
+                break
+
+        if chosen is None:
+            for m in max_by_term:
+                if (
+                    m.get("termMonths") == payload.termMonths
+                    and payload.creditSum <= m.get("maxSum", 0)
+                ):
+                    chosen = m
+                    break
+
+        if chosen is None:
+            raise HTTPException(
+                status_code=400, detail="Выбранный вариант не из предложения"
+            )
+
+        rate = float(chosen.get("rate", 0))
+
+        application.amount = payload.creditSum
+        application.term_months = payload.termMonths
+        application.rate = rate
+        application.bank_name = payload.bankName
+        application.bic = payload.bic
+        application.account_number = payload.accountNumber
+        application.approved_limit = payload.creditSum
+        application.status = "AWAITING_DISBURSEMENT"
+
+        db.add(
+            models.ApplicationStatusHistory(
+                application_id=application.id, status="AWAITING_DISBURSEMENT"
+            )
+        )
+        db.add(
+            models.PaymentOrder(
+                application_id=application.id,
+                number=str(application.number),
+                date=date.today(),
+                amount=payload.creditSum,
                 recipient=user.company_name or user.phone_number,
                 recipient_account=payload.accountNumber,
             )

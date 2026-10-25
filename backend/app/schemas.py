@@ -29,6 +29,7 @@ class RegisterRequest(BaseModel):
     refinanceLoanIds: list[int] = Field(default_factory=list)
     companyName: str | None = None
 
+
 class LoginRequest(BaseModel):
     phoneNumber: str
 
@@ -73,6 +74,7 @@ class ApplicationCreateRequest(BaseModel):
     purpose: str
     termMonths: int
 
+
 class LimitRange(BaseModel):
     min: int
     max: int
@@ -94,6 +96,20 @@ class ProductInfo(BaseModel):
     withCollateral: bool
 
 
+class OfferInfo(BaseModel):
+    creditSum: int
+    termMonths: int
+    rate: float
+    monthlyPayment: int
+
+
+class MaxByTermItem(BaseModel):
+    termMonths: int
+    maxSum: int
+    rate: float
+    monthlyPayment: int
+
+
 class ApplicationDetails(BaseModel):
     id: str
     number: int
@@ -109,6 +125,11 @@ class ApplicationDetails(BaseModel):
     termMonths: int | None = None
     rate: float | None = None
     approvedLimit: int | None = None
+    offers: list[OfferInfo] | None = None
+    maxByTerm: list[MaxByTermItem] | None = None
+    limit: LimitRange | None = None
+    termLimit: TermLimit | None = None
+    clientMessage: str | None = None
 
 
 class AdditionalInfoRequest(BaseModel):
@@ -139,6 +160,14 @@ class AcceptResponse(BaseModel):
     termMonths: int
     rate: float
     updatedAt: datetime
+
+
+class AcceptOfferRequest(BaseModel):
+    creditSum: int
+    termMonths: int
+    bankName: str
+    bic: str
+    accountNumber: str
 
 
 # ---------- Admin ----------
