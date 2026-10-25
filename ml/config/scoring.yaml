@@ -1,0 +1,54 @@
+# Параметры кредитного решения и расчёта фич.
+# Все пороги — здесь, не в коде. Значения — стартовые допущения,
+# калибруются после обучения моделей.
+
+# Ставка по риску: стоимость денег 14% (ключевая ставка на 23.10.2026) + расходы 2%
+# + плата за капитал 0.7% = 16.7%, плюс ожидаемые потери PD × 45%,
+# округлено вверх на верхней границе интервала PD.
+rate_buckets:
+  - {max_pd: 0.03, rate: 0.18}
+  - {max_pd: 0.07, rate: 0.20}
+  - {max_pd: 0.11, rate: 0.22}
+  - {max_pd: 0.15, rate: 0.24}
+terms_months: [6, 12, 18, 24, 30, 36]
+min_amount: 100000
+amount_step: 50000
+max_offers: 2
+offer_validity_days: 10
+
+min_dscr: 1.25
+
+stage1:
+  approve_pd: 0.05          # PD₁ < 5% — подбор суммы без выписок
+  decline_pd: 0.30          # PD₁ > 30% — отказ
+  flow_haircut: 0.8         # понижающий коэффициент оценки потока по выручке
+  grey_zone_offer: true     # предложение меньшей суммы для PD₁ 5–30%
+
+stage2:
+  cutoff_pd: 0.15           # выше — ставка 24% уже не покрывает ожидаемые потери
+  min_statement_months: 3   # меньше — модель 2 не считается, отказ
+
+stop_rules:
+  director_bankruptcy_months: 36   # 127-ФЗ, ст. 213.30: 3 года нельзя управлять юрлицом
+  ip_bankruptcy_months: 60         # 127-ФЗ, ст. 216: 5 лет нельзя быть ИП
+
+features:
+  dpd_window_months: 24
+  inquiries_window_days: 90
+  tax_debt_threshold: 10000
+  owner_share_threshold: 0.25     # участник ООО считается собственником при доле > 25%
+  revenue_min_months: 3           # минимум полных месяцев оборотов для пересчёта выручки на год
+  conservative_flow_percentile: 20
+  trend_min_months: 12
+  ip_living_cost_monthly: 30000   # вычитается из потока ИП вместо зарплаты собственнику
+
+# Группы ОКВЭД по первым двум цифрам кода и типовая маржа для оценки потока на этапе 1.
+okved_groups:
+  agriculture:   {codes: [[1, 3]],             margin: 0.10}
+  manufacturing: {codes: [[10, 33]],           margin: 0.12}
+  construction:  {codes: [[41, 43]],           margin: 0.10}
+  trade:         {codes: [[45, 47]],           margin: 0.06}
+  transport:     {codes: [[49, 53]],           margin: 0.12}
+  food_service:  {codes: [[55, 56]],           margin: 0.10}
+  it_services:   {codes: [[58, 63], [69, 82]], margin: 0.20}
+  other:         {codes: [],                   margin: 0.10}

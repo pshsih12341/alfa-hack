@@ -1,0 +1,172 @@
+# Параметры генератора синтетических данных. Все доли и коэффициенты — допущения.
+
+seed: 42
+target_default_rate: 0.06   # калибруется свободным членом истинной формулы риска на train
+
+samples:
+  train:    {size: 20000, months: ["2023-07", "2024-12"]}
+  test_oot: {size: 5000,  months: ["2025-01", "2025-06"]}
+  drift:
+    size: 5000
+    shares: [0.05, 0.10, 0.20, 0.50]
+    month: "2025-07"                # все партии в одном месяце: экономический цикл не смешивается с дрейфом
+    scenarios: [population_shift, macro_shock]
+
+# Срез для баз-моков: заявки подаются в день демо, от него считаются возраст бизнеса,
+# окна банкротств, обороты за 12 месяцев и запросы в БКИ за 90 дней.
+demo:
+  size: 2000
+  as_of: "2026-11-01"               # поменять на дату защиты
+
+population:
+  ip_share: 0.63                    # доля ИП среди заёмщиков МСП (ЦБ); в реестре МСП ИП ≈ 70%
+  young_share: 0.12                 # бизнес младше 12 месяцев
+  age_median_months: 48
+  age_sigma: 0.8
+  alfa_client_share: 0.35
+  # Близко к структуре выдач МСП за июнь 2026 (ЦБ): торговля 28.6%, проф. деятельность 20.2%,
+  # строительство 14.5%, обработка 10.7%.
+  okved_mix: {trade: 0.30, it_services: 0.20, construction: 0.14, transport: 0.08,
+              manufacturing: 0.10, food_service: 0.06, agriculture: 0.04, other: 0.08}
+  revenue_median: {ip: 6000000, ooo: 25000000}
+  revenue_sigma: 1.0
+  revenue_min: 300000
+  revenue_cap: 800000000            # верхняя граница выручки малого бизнеса
+  fns_min_age_months: 18            # раньше в открытых данных ФНС нет годовой отчётности
+  declared_inflation: [1.0, 1.5]    # во сколько раз клиент завышает выручку в анкете
+  marketplace_share_of_trade: 0.2
+
+okved_codes:
+  trade: ["47.11", "47.19", "47.91", "46.90", "45.20"]
+  it_services: ["62.01", "62.02", "63.11", "70.22", "73.11"]
+  construction: ["41.20", "43.21", "43.31"]
+  transport: ["49.41", "49.32", "52.29"]
+  manufacturing: ["10.71", "16.23", "25.11"]
+  food_service: ["56.10", "56.29", "55.10"]
+  agriculture: ["01.11", "01.13", "01.41"]
+  other: ["68.20", "85.41", "93.13", "96.02"]
+
+persons:
+  participants_probs: [0.5, 0.3, 0.2]   # 1, 2, 3 участника ООО
+  director_is_participant: 0.7
+  history_prob: 0.85                    # у физлица есть кредитная история
+  problem_track_share: 0.10
+  old_bankruptcy_share_of_problem: 0.3  # банкротство давнее окна стоп-правила
+
+bki:
+  company_history_prob: {young: 0.15, mature: 0.6}
+  dpd_shares: {"0": 0.72, "1-29": 0.15, "30-89": 0.08, "90+": 0.05}
+  inquiries_base: 0.5
+  inquiries_stress: 0.9             # при стрессе бизнес обходит много кредиторов
+  old_inquiries_lambda: 0.8         # запросы старше 90 дней: в фичу не входят, проверяют окно
+  business_loans_prob: 0.6
+  young_loans_factor: 0.3
+  debt_to_revenue_median: 0.12
+  debt_to_revenue_sigma: 0.8
+  extra_loans_lambda: 0.5
+  business_loan_rate: 0.20
+  remaining_months: [6, 36]
+  ip_consumer_loan_prob: 0.35
+  ip_mortgage_prob: 0.12
+  lenders: ["Банк Север", "Банк Восток", "Банк Запад", "Банк Юг", "Банк Центр", "Банк Регион"]
+
+tax:
+  debt_prob: 0.07
+  debt_median: 60000
+  technical_debt_prob: 0.10         # мелкий долг ниже порога фичи
+
+flows:
+  months: 12
+  margin_sd: 0.05
+  margin_bonus: 0.04                # реальная маржа выше типовой: оценка этапа 1 по типовой марже консервативна
+  ip_margin_bonus: 0.05             # в потоке ИП есть и его собственный доход, у ООО зарплата директора — расход
+  fixed_cost_share: 0.10            # доля постоянных расходов: в провальные месяцы поток падает сильнее выручки
+  volatility: [0.03, 0.15]          # месячный шум поступлений
+  growth_mean: 0.05
+  growth_sd: 0.15
+  dip_prob: 0.03
+  dip_depth: [0.3, 0.7]
+  ramp_months: 4                    # раскрутка молодого бизнеса
+  acquiring_share: {trade: 0.45, food_service: 0.70, other: 0.20, default: 0.05}
+  cash_share: {trade: 0.10, food_service: 0.15, default: 0.02}
+  cost_split: {suppliers: 0.55, salary: 0.25, rent: 0.10, taxes: 0.10}
+  ip_no_staff_share: 0.4
+  top_customer_beta: [2, 5]
+  marketplace_top_share: [0.6, 0.95]
+  own_transfer_prob: 0.15
+  owner_funding_prob: 0.02
+  loan_received_prob: 0.3
+  other_debt_prob: 0.01             # возврат займа учредителю: долга нет в БКИ, остаётся в расходах
+  ip_payout_share: [0.3, 0.8]
+  dividend_prob: 0.08
+  seasonality:                      # январь … декабрь, нормируется к среднему 1
+    agriculture:  [0.6, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.4, 1.6, 1.4, 1.0, 0.9]
+    construction: [0.6, 0.6, 0.8, 1.0, 1.1, 1.2, 1.3, 1.3, 1.2, 1.1, 0.9, 0.9]
+    trade:        [0.85, 0.85, 0.95, 0.95, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.05, 1.35]
+    food_service: [0.85, 0.85, 0.95, 1.0, 1.05, 1.15, 1.2, 1.15, 1.0, 0.95, 0.9, 0.95]
+    default:      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+
+applications:
+  loan_to_revenue_median: 0.08
+  loan_to_revenue_sigma: 0.7
+  max_amount: 30000000
+  term_probs: {6: 0.08, 12: 0.30, 18: 0.12, 24: 0.25, 30: 0.05, 36: 0.20}
+  purpose_probs: {working_capital: 0.50, equipment: 0.20, real_estate: 0.05, refinancing: 0.15, other: 0.10}
+  other_purposes: ["Ремонт помещения", "Участие в тендере", "Расширение ассортимента"]
+  refinance_markup: [1.0, 1.3]      # запрошенная сумма к остатку рефинансируемых кредитов
+
+# Истинная формула риска: логит PD = свободный член + сумма вкладов + скрытый шум.
+# Знаки совпадают с колонкой «Риск» в спецификации. Модели формулу не видят.
+risk:
+  latent_noise_sd: 1.1              # необъяснимая часть риска: задаёт достижимый Gini
+  coefficients:
+    ip: 0.15
+    log_age: -0.45                  # × ln(1 + возраст в месяцах / 6)
+    okved: {trade: 0.0, food_service: 0.4, construction: 0.3, transport: 0.1,
+            manufacturing: -0.1, it_services: -0.2, agriculture: 0.2, other: 0.0}
+    log_revenue: -0.15              # × ln(выручка / 10 млн)
+    leverage: 1.2                   # × ln(1 + 3 × (запрошенная сумма + текущий долг) / выручка)
+    log_dscr: -0.8                  # × ln(DSCR, обрезанный до 0.2–5)
+    dscr_below_1: 0.6
+    volatility: 3.0
+    growth: -1.0
+    dpd: {"0": 0.0, "1-29": 0.4, "30-89": 1.0, "90+": 1.8, no_history: 0.3}
+    inquiries: 0.15                 # × min(запросы, 10)
+    tax_debt: 0.6
+    track_record: {ok: 0.0, first: 0.2, problem: 0.7}
+    top_customer: 1.0
+  # Взаимодействия: WoE + логрегрессия складывает вклады фич по отдельности
+  # и такие эффекты передаёт только приближённо.
+  interactions:
+    young_leverage: 0.6             # × ln(1 + 3 × нагрузка) у бизнеса младше года
+    tax_debt_severe_dpd: 0.5        # налоговый долг вместе с просрочкой 30+ дней
+    volatility_low_dscr: 2.0        # × волатильность, когда DSCR < 1
+  # Экономический цикл: сдвиг логита по месяцу заявки, ≈ ±15% к шансам дефолта.
+  cycle:
+    amplitude: 0.15
+    period_months: 24
+    start_month: "2023-07"
+
+anomalies:
+  outlier_share: 0.05
+  outlier_types: {revenue_typo: 0.3, one_off_contract: 0.3, giant_company: 0.2, duplicated_month: 0.2}
+  one_off_multiplier: [5, 15]       # разовый контракт в месячных выручках
+  giant_multiplier: 20
+  stop_rule_share: 0.05
+  stop_rule_types: {inactive_status: 0.25, company_bankruptcy: 0.20, owner_bankruptcy: 0.35, rfm_list: 0.20}
+
+drift_scenarios:
+  population_shift:                 # меняется состав клиентов, закон риска прежний
+    overrides:
+      population:
+        ip_share: 0.75
+        young_share: 0.40
+        alfa_client_share: 0.15
+        marketplace_share_of_trade: 0.6
+        declared_inflation: [1.1, 1.8]
+        okved_mix: {trade: 0.45, it_services: 0.12, construction: 0.10, transport: 0.10,
+                    manufacturing: 0.05, food_service: 0.08, agriculture: 0.03, other: 0.07}
+  macro_shock:                      # меняется закон риска: кризис
+    revenue_shock: -0.15            # падение поступлений в последние shock_months месяцев
+    shock_months: 4
+    intercept_shift: 0.4            # при тех же фичах шансы дефолта ×1.5

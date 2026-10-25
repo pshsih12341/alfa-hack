@@ -1,0 +1,23 @@
+[project]
+name = "alfa-ml"
+version = "0.1.0"
+description = "ML-часть кредитного конвейера: синтетические данные, фичи, модели скоринга"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "numpy>=2.1",
+    "pandas>=2.2",
+    "psycopg[binary]>=3.2",
+    "pyarrow>=17",
+    "pyyaml>=6.0",
+    "sqlalchemy>=2.0",
+]
+
+[dependency-groups]
+dev = ["pytest>=8.3"]
+
+[build-system]
+requires = ["uv_build>=0.10.7,<0.11"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
