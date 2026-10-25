@@ -10,6 +10,8 @@ from .. import models
 from ..auth import get_current_user
 from ..database import SessionLocal
 from ..schemas import (
+    ALLOWED_PURPOSES,
+    ALLOWED_TERM_MONTHS,
     AcceptRequest,
     AcceptResponse,
     AdditionalInfoRequest,
@@ -77,14 +79,17 @@ def list_applications(user: models.User = Depends(get_current_user)):
         )
     return ApplicationListResponse(items=[_short(a) for a in rows])
 
-
-@router.post("", response_model=ApplicationShort, status_code=201)
 @router.post("", response_model=ApplicationShort, status_code=201)
 def create_application(
     payload: ApplicationCreateRequest,
     background: BackgroundTasks,
     user: models.User = Depends(get_current_user),
 ):
+    if payload.purpose not in ALLOWED_PURPOSES:
+        raise HTTPException(status_code=400, detail="Недопустимая цель кредита")
+    if payload.termMonths not in ALLOWED_TERM_MONTHS:
+        raise HTTPException(status_code=400, detail="Недопустимый срок кредита")
+
     with SessionLocal() as db:
         last_number = db.execute(
             select(models.Application.number)
@@ -100,6 +105,7 @@ def create_application(
             status="PRESCORING",
             credit_sum=payload.creditSum,
             purpose=payload.purpose,
+            requested_term_months=payload.termMonths,
         )
         db.add(application)
         db.flush()

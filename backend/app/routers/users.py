@@ -10,6 +10,7 @@ from ..database import SessionLocal, utcnow
 from ..scoring import run_scoring
 from ..schemas import (
     ALLOWED_PURPOSES,
+    ALLOWED_TERM_MONTHS,
     LoginRequest,
     RegisterRequest,
     UserResponse,
@@ -31,6 +32,12 @@ def _normalize_phone(phone: str) -> str:
 def register(payload: RegisterRequest, background: BackgroundTasks):
     if payload.purpose not in ALLOWED_PURPOSES:
         raise HTTPException(status_code=400, detail="Недопустимая цель кредита")
+    if not payload.bkiConsent:
+        raise HTTPException(status_code=400, detail="Требуется согласие на запрос в БКИ")
+    if payload.purpose not in ALLOWED_PURPOSES:
+        raise HTTPException(status_code=400, detail="Недопустимая цель кредита")
+    if payload.termMonths not in ALLOWED_TERM_MONTHS:
+        raise HTTPException(status_code=400, detail="Недопустимый срок кредита")
     if not payload.bkiConsent:
         raise HTTPException(status_code=400, detail="Требуется согласие на запрос в БКИ")
 
@@ -59,6 +66,7 @@ def register(payload: RegisterRequest, background: BackgroundTasks):
             status="PRESCORING",
             credit_sum=payload.creditSum,
             purpose=payload.purpose,
+            requested_term_months=payload.termMonths, 
             revenue_last_12m=payload.revenueLast12m,
             bki_consent=payload.bkiConsent,
             bki_consent_at=utcnow(),

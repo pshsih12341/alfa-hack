@@ -81,7 +81,7 @@ def _run_scoring_ml(application_id: str) -> None:
             "applicationId": str(application.id),
             "inn": _get_client_inn(application.client_id, db),
             "creditSum": application.credit_sum,
-            "termMonths": 36,  # TODO: хранить в заявке, пока дефолт
+            "termMonths": application.requested_term_months,
             "purpose": application.purpose,
             "refinanceLoanIds": application.refinance_loan_ids or [],
             "revenueLast12m": application.revenue_last_12m,

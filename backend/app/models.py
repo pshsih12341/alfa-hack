@@ -71,6 +71,7 @@ class Application(Base):
     bki_consent = mapped_column(Boolean, nullable=True)
     bki_consent_at = mapped_column(DateTime(timezone=True), nullable=True)
     refinance_loan_ids = mapped_column(JSON, nullable=True, default=list)
+    requested_term_months = mapped_column(Integer, nullable=False, server_default="36")
     scoring_response = mapped_column(JSON, nullable=True)
 
 class ApplicationStatusHistory(Base):

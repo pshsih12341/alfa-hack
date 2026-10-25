@@ -13,6 +13,8 @@ ALLOWED_PURPOSES = {
     "refinancing",
 }
 
+ALLOWED_TERM_MONTHS = {6, 12, 18, 24, 30, 36}
+
 
 # ---------- Auth ----------
 
@@ -21,11 +23,11 @@ class RegisterRequest(BaseModel):
     inn: str = Field(min_length=10, max_length=12)
     creditSum: int = Field(ge=0)
     purpose: str
+    termMonths: int
     revenueLast12m: int | None = Field(default=None, ge=0)
     bkiConsent: bool
-    refinanceLoanIds: list[str] = Field(default_factory=list)
+    refinanceLoanIds: list[int] = Field(default_factory=list)
     companyName: str | None = None
-
 
 class LoginRequest(BaseModel):
     phoneNumber: str
@@ -69,7 +71,7 @@ class ApplicationListResponse(BaseModel):
 class ApplicationCreateRequest(BaseModel):
     creditSum: int = Field(ge=0)
     purpose: str
-
+    termMonths: int
 
 class LimitRange(BaseModel):
     min: int
