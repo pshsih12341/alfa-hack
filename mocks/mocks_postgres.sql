@@ -1,7 +1,23 @@
 -- Базы-моки источников для кредитного конвейера. Сгенерировано: python -m alfa_ml.synth.
 -- Не редактировать вручную: данные пересоздаются генератором с тем же seed.
-CREATE DATABASE mocks;
+\set ON_ERROR_STOP on
+SELECT 'CREATE DATABASE mocks OWNER credit_kiosk'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'mocks')\gexec
+ALTER DATABASE mocks OWNER TO credit_kiosk;
 \connect mocks
+SET ROLE credit_kiosk;
+DROP TABLE IF EXISTS egr_roles CASCADE;
+DROP TABLE IF EXISTS rfm_entries CASCADE;
+DROP TABLE IF EXISTS fns_financials CASCADE;
+DROP TABLE IF EXISTS fns_ens CASCADE;
+DROP TABLE IF EXISTS egr_person_history CASCADE;
+DROP TABLE IF EXISTS egr_organizations CASCADE;
+DROP TABLE IF EXISTS efrsb_cases CASCADE;
+DROP TABLE IF EXISTS bki_subjects CASCADE;
+DROP TABLE IF EXISTS bki_loans CASCADE;
+DROP TABLE IF EXISTS bki_inquiries CASCADE;
+DROP TABLE IF EXISTS alfa_turnover CASCADE;
+DROP TABLE IF EXISTS alfa_clients CASCADE;
 
 CREATE TABLE alfa_clients (
 	inn TEXT NOT NULL, 

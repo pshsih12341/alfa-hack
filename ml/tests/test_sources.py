@@ -115,6 +115,9 @@ def test_postgres_init_file(batch, tmp_path):
     write_postgres_init(batch, path)
     text = path.read_text(encoding="utf-8")
     assert text.count("CREATE TABLE") == len(metadata.tables)
+    # Повторный запуск и запуск от суперпользователя: база и таблицы принадлежат credit_kiosk.
+    assert "\\gexec" in text and "SET ROLE credit_kiosk;" in text
+    assert text.count("DROP TABLE IF EXISTS") == len(metadata.tables)
     assert "NUMERIC(15, 2)" in text and "DATE" in text and "BOOLEAN" in text
     # В каждом блоке COPY столько строк, сколько в таблице, и в каждой строке столько полей, сколько колонок.
     tables = source_tables(batch)

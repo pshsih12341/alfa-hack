@@ -89,15 +89,24 @@ def _copy_value(value) -> str:
     return text.replace("\\", "\\\\").replace("\t", "\\t").replace("\n", "\\n").replace("\r", "\\r")
 
 
-def write_postgres_init(batch, path: Path, database: str = "mocks") -> None:
-    """SQL-файл для docker-entrypoint-initdb.d: создаёт базу database, схему и загружает данные через COPY."""
+def write_postgres_init(batch, path: Path, database: str = "mocks", owner: str = "credit_kiosk") -> None:
+    """SQL-файл для psql: создаёт базу database, схему и загружает данные через COPY.
+
+    Можно запускать повторно и от суперпользователя (sudo -u postgres psql -f …), и как
+    init-скрипт контейнера: база и таблицы принадлежат owner, старые таблицы пересоздаются.
+    """
     dialect = postgresql.dialect()
     tables = source_tables(batch)
     lines = [
         "-- Базы-моки источников для кредитного конвейера. Сгенерировано: python -m alfa_ml.synth.",
         "-- Не редактировать вручную: данные пересоздаются генератором с тем же seed.",
-        f"CREATE DATABASE {database};",
+        "\\set ON_ERROR_STOP on",
+        f"SELECT 'CREATE DATABASE {database} OWNER {owner}'",
+        f"WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '{database}')\\gexec",
+        f"ALTER DATABASE {database} OWNER TO {owner};",
         f"\\connect {database}",
+        f"SET ROLE {owner};",
+        *[f"DROP TABLE IF EXISTS {table.name} CASCADE;" for table in reversed(metadata.sorted_tables)],
         "",
     ]
     for table in metadata.sorted_tables:
