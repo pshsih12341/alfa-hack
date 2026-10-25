@@ -4,7 +4,7 @@
 """
 
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Protocol
 
 from sqlalchemy import delete, select
@@ -42,7 +42,13 @@ class DBSessionStore:
             session = db.execute(
                 select(DBSession).where(DBSession.token == session_id)
             ).scalar_one_or_none()
-            if session is None or session.expires_at < utcnow():
+            if session is None:
+                return None
+            # Если expires_at без tzinfo (старые записи), считаем, что UTC
+            expires = session.expires_at
+            if expires.tzinfo is None:
+                expires = expires.replace(tzinfo=timezone.utc)
+            if expires < utcnow():
                 return None
             return session.client_id
 

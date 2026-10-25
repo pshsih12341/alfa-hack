@@ -17,5 +17,5 @@ Base = declarative_base()
 
 
 def utcnow() -> datetime:
-    """Нейтральная UTC-дата без tzinfo для сравнения naively."""
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    """UTC-дата с tzinfo, чтобы миграции и ORM работали с timezone-aware datetime."""
+    return datetime.now(timezone.utc)

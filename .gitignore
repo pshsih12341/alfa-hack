@@ -39,5 +39,10 @@ server.log
 
 # Temp
 tmp/
-temp/
+temp/                                                       
 *.tmp
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    .env
+.env.docker
+backend/.env
+backend/.env.docker
+pgdata/

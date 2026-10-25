@@ -1,26 +1,52 @@
 services:
-  frontend:
-    build:
-      context: ./frontend
-    ports:
-      - "3000:80"
-    restart: unless-stopped
-
   postgres:
     image: postgres:16
     environment:
       POSTGRES_DB: credit_kiosk
       POSTGRES_USER: credit_kiosk
       POSTGRES_PASSWORD: credit_kiosk
-    ports:
-      - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./mocks/mocks_postgres.sql:/docker-entrypoint-initdb.d/20_mocks.sql:ro
+    ports:
+      - "5433:5432"          # 5432 занят локальным Postgres на машине разработчика
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U credit_kiosk -d credit_kiosk"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   redis:
     image: redis:7
+    #ports:
+     #sudo ss -tlnp | grep 8000 - "6379:6379"
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg2://credit_kiosk:credit_kiosk@postgres:5432/credit_kiosk
+      MOCKS_DATABASE_URL: postgresql+psycopg2://credit_kiosk:credit_kiosk@postgres:5432/mocks
+      REDIS_URL: redis://redis:6379/0
+      COOKIE_NAME: ck_session
+      COOKIE_MAX_AGE: "2592000"
+      COOKIE_SECURE: "false"
+      COOKIE_SAME_SITE: lax
+      CORS_ORIGINS: http://localhost:8080,http://localhost:8000
+      AUTO_CREATE_TABLES: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
     ports:
-      - "6379:6379"
+      - "8000:8000"
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
 
 volumes:
   pgdata:
