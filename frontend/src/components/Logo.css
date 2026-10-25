@@ -8,29 +8,8 @@
   letter-spacing: -0.35px;
 }
 
-.logo__sign {
-  position: relative;
+.logo__image {
   width: 28px;
-  height: 30px;
-  display: inline-flex;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 4px;
-}
-
-.logo__sign i {
-  width: 7px;
-  height: 29px;
+  height: 28px;
   display: block;
-  border-radius: 1px;
-  background: currentColor;
-  transform-origin: bottom;
-}
-
-.logo__sign i:first-child {
-  transform: skew(-17deg);
-}
-
-.logo__sign i:last-child {
-  transform: skew(17deg);
 }

@@ -1,67 +1,117 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { api, ApiError } from './api'
 import AdminPage from './pages/AdminPage'
 import CabinetPage from './pages/CabinetPage'
 import RegistrationPage from './pages/RegistrationPage'
 
 function App() {
-  const [page, setPage] = useState('registration')
+  const [sessionLoading, setSessionLoading] = useState(true)
   const [authMode, setAuthMode] = useState('registration')
-  const [userData, setUserData] = useState({})
+  const [userData, setUserData] = useState(null)
   const [applications, setApplications] = useState([])
+  const [initialApplicationId, setInitialApplicationId] = useState(null)
 
-  const handleAuthenticated = (data) => {
-    setUserData(data)
-
-    if (data.isAdmin) {
-      setApplications([])
-      setPage('admin')
-      return
-    }
-
-    setApplications([
-      {
-        id: `application-${Date.now()}`,
-        number: 1,
-        status: 'SUCCESS',
-        creditSum: data.creditSum || 500_000_000,
-        purpose: data.purpose || 'Пополнение оборотных средств',
-      },
-    ])
-    setPage('cabinet')
+  const loadClientApplications = async () => {
+    const response = await api.getApplications()
+    setApplications(response.items)
   }
 
-  const handleAddApplication = (data) => {
-    const application = {
-      ...data,
-      id: `application-${Date.now()}`,
-      number: applications.length + 1,
-      status: 'PRESCORING',
+  useEffect(() => {
+    const restoreSession = async () => {
+      try {
+        const user = await api.getMe()
+        setUserData(user)
+
+        if (!user.isAdmin) {
+          await loadClientApplications()
+        }
+      } catch (error) {
+        if (!(error instanceof ApiError) || error.status !== 401) {
+          console.error(error)
+        }
+      } finally {
+        setSessionLoading(false)
+      }
     }
 
+    restoreSession()
+  }, [])
+
+  const handleAuthenticated = async (form, mode) => {
+    let applicationId = null
+
+    if (mode === 'login') {
+      await api.login(form.phoneNumber)
+    } else {
+      const response = await api.register({
+        phoneNumber: form.phoneNumber,
+        inn: form.inn,
+        creditSum: form.creditSum / 100,
+        purpose: form.purpose,
+        termMonths: form.termMonths,
+        bkiConsent: form.bkiConsent,
+        revenueLast12m: null,
+        refinanceLoanIds: [],
+        companyName: null,
+      })
+      applicationId = response.applicationId
+    }
+
+    const user = await api.getMe()
+    if (!user.isAdmin) {
+      await loadClientApplications()
+    }
+    setInitialApplicationId(applicationId)
+    setUserData(user)
+  }
+
+  const handleAddApplication = async (data) => {
+    const application = await api.createApplication({
+      ...data,
+      creditSum: data.creditSum / 100,
+    })
     setApplications((current) => [...current, application])
     return application
   }
 
-  const handleLogout = () => {
-    setUserData({})
-    setApplications([])
-    setAuthMode('login')
-    setPage('registration')
+  const handleApplicationUpdated = (application) => {
+    setApplications((current) =>
+      current.map((item) =>
+        item.id === application.id ? { ...item, ...application } : item,
+      ),
+    )
   }
 
-  if (page === 'cabinet') {
+  const handleLogout = async () => {
+    try {
+      await api.logout()
+    } finally {
+      setUserData(null)
+      setApplications([])
+      setInitialApplicationId(null)
+      setAuthMode('login')
+    }
+  }
+
+  if (sessionLoading) {
+    return <main className="app-loading">Загружаем личный кабинет…</main>
+  }
+
+  if (userData?.isAdmin) {
+    return <AdminPage onLogout={handleLogout} />
+  }
+
+  if (userData) {
     return (
       <CabinetPage
         userData={userData}
         applications={applications}
+        initialApplicationId={initialApplicationId}
         onAddApplication={handleAddApplication}
+        onApplicationUpdated={handleApplicationUpdated}
         onLogout={handleLogout}
       />
     )
-  }
-
-  if (page === 'admin') {
-    return <AdminPage onLogout={handleLogout} />
   }
 
   return (

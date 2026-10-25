@@ -72,14 +72,26 @@
 }
 
 .application-card__status_info,
-.application-card__status_prescoring {
+.application-card__status_prescoring,
+.application-card__status_scoring {
   color: #805b00;
   background: #fff2cc;
 }
 
-.application-card__status_success {
+.application-card__status_success,
+.application-card__status_offer {
   color: #137a45;
   background: #e4f7eb;
+}
+
+.application-card__status_awaiting_disbursement {
+  color: #075d86;
+  background: #e1f3fb;
+}
+
+.application-card__status_completed {
+  color: #365c47;
+  background: #e8f0eb;
 }
 
 .application-card__status_rejected {
@@ -119,6 +131,14 @@
 
 .new-application-required {
   color: #ef3124;
+}
+
+.new-application-error {
+  padding: 12px 14px;
+  border-radius: 12px;
+  color: #a01810;
+  background: #feeceb;
+  font-size: 14px;
 }
 
 @media (max-width: 760px) {

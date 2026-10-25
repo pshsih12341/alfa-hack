@@ -1,32 +1,51 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AmountInput } from '@alfalab/core-components-amount-input'
 import { Button } from '@alfalab/core-components-button'
 import { Modal } from '@alfalab/core-components-modal'
 import { Select } from '@alfalab/core-components-select'
-import { creditPurposeOptions, getCreditPurpose } from '../../data/creditPurposes'
+import { creditPurposeOptions, getCreditPurposeLabel } from '../../data/creditPurposes'
 import './ApplicationsList.css'
 
 const statusLabels = {
   INFO: 'Нужны данные',
   PRESCORING: 'Прескоринг',
+  SCORING: 'Скоринг',
   SUCCESS: 'Одобрено',
+  OFFER: 'Есть предложение',
+  AWAITING_DISBURSEMENT: 'Ожидает выдачи',
+  COMPLETED: 'Исполнена',
   REJECTED: 'Отклонено',
 }
 
 const initialApplication = {
   creditSum: null,
   purpose: '',
+  termMonths: 24,
 }
+
+const termOptions = [6, 12, 18, 24, 30, 36].map((months) => ({
+  key: String(months),
+  content: `${months} месяцев`,
+}))
 
 const formatAmount = (value) => {
   if (!value) return 'Сумма не указана'
-  return `${new Intl.NumberFormat('ru-RU').format(value / 100)} ₽`
+  return `${new Intl.NumberFormat('ru-RU').format(value)} ₽`
 }
 
-function ApplicationsList({ applications, onOpen, onAdd }) {
+function ApplicationsList({ applications, onOpen, onAdd, openCreate, onCreateOpened }) {
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState(initialApplication)
-  const formComplete = Boolean(form.creditSum && form.purpose)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+  const formComplete = Boolean(form.creditSum && form.purpose && form.termMonths)
+
+  useEffect(() => {
+    if (openCreate) {
+      setModalOpen(true)
+      onCreateOpened()
+    }
+  }, [openCreate, onCreateOpened])
 
   const setField = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }))
@@ -35,15 +54,23 @@ function ApplicationsList({ applications, onOpen, onAdd }) {
   const closeModal = () => {
     setModalOpen(false)
     setForm(initialApplication)
+    setError('')
   }
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault()
-    onAdd({
-      creditSum: form.creditSum,
-      purpose: getCreditPurpose(form.purpose),
-    })
-    closeModal()
+    setSubmitting(true)
+    setError('')
+
+    try {
+      const application = await onAdd(form)
+      closeModal()
+      onOpen(application.id, application)
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -79,7 +106,7 @@ function ApplicationsList({ applications, onOpen, onAdd }) {
                 </span>
               </div>
 
-              <h2>{application.purpose}</h2>
+              <h2>{getCreditPurposeLabel(application.purpose)}</h2>
               <div className="application-card__amount">
                 {formatAmount(application.creditSum)}
               </div>
@@ -143,6 +170,21 @@ function ApplicationsList({ applications, onOpen, onAdd }) {
               selected={form.purpose || null}
               onChange={({ selected }) => setField('purpose', selected?.key ?? '')}
             />
+            <Select
+              block
+              size={56}
+              label={
+                <>
+                  Срок кредита <span className="new-application-required">*</span>
+                </>
+              }
+              options={termOptions}
+              selected={String(form.termMonths)}
+              onChange={({ selected }) =>
+                setField('termMonths', Number(selected?.key || 24))
+              }
+            />
+            {error && <div className="new-application-error">{error}</div>}
           </form>
         </Modal.Content>
         <Modal.Footer layout="column">
@@ -152,9 +194,9 @@ function ApplicationsList({ applications, onOpen, onAdd }) {
             view="accent"
             size={56}
             block
-            disabled={!formComplete}
+            disabled={!formComplete || submitting}
           >
-            Создать заявку
+            {submitting ? 'Создаём…' : 'Создать заявку'}
           </Button>
         </Modal.Footer>
       </Modal>

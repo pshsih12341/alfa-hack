@@ -39,6 +39,20 @@
   padding: 44px 0 80px;
 }
 
+.admin-message {
+  margin-bottom: 18px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  color: #5e5e63;
+  background: #eaeaeb;
+  font-size: 14px;
+}
+
+.admin-message_error {
+  color: #a01810;
+  background: #feeceb;
+}
+
 .admin-page-heading {
   display: flex;
   align-items: flex-end;
@@ -141,6 +155,13 @@
   overflow-x: auto;
 }
 
+.admin-table-loading {
+  padding: 28px;
+  color: #737378;
+  text-align: center;
+  font-size: 14px;
+}
+
 .admin-table {
   width: 100%;
   min-width: 1100px;
@@ -228,7 +249,8 @@
   background: #fff2cc;
 }
 
-.admin-status_success {
+.admin-status_success,
+.admin-status_offer {
   color: #137a45;
   background: #e4f7eb;
 }
@@ -301,6 +323,18 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
+}
+
+.admin-details-grid > * {
+  order: 3;
+}
+
+.admin-details-card_payment {
+  order: 1;
+}
+
+.admin-details-card_history {
+  order: 2;
 }
 
 .admin-details-card {
@@ -422,6 +456,10 @@
   border-radius: 20px;
   color: #fff;
   background: #171719;
+}
+
+.admin-complete-action_top {
+  margin-bottom: 16px;
 }
 
 .admin-complete-action strong {

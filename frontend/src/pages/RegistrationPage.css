@@ -130,6 +130,33 @@
   margin-top: 12px;
 }
 
+.bki-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: #55555a;
+  font-size: 14px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.bki-consent input {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  margin: 1px 0 0;
+  accent-color: #ef3124;
+}
+
+.form-error {
+  padding: 12px 14px;
+  border-radius: 12px;
+  color: #a01810;
+  background: #feeceb;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
 .legal {
   margin: 0;
 }
@@ -181,14 +208,9 @@
     font-size: 17px;
   }
 
-  .mobile-header .logo__sign {
+  .mobile-header .logo__image {
     width: 24px;
-    height: 26px;
-  }
-
-  .mobile-header .logo__sign i {
-    width: 6px;
-    height: 25px;
+    height: 24px;
   }
 
   .mobile-header > span {

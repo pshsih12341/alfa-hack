@@ -2,12 +2,14 @@ import { useState } from 'react'
 import { Button } from '@alfalab/core-components-button'
 import { Input } from '@alfalab/core-components-input'
 import { Select } from '@alfalab/core-components-select'
+import { getCreditPurposeLabel } from '../../data/creditPurposes'
 
 const statusLabels = {
   PRESCORING: 'Прескоринг',
   SCORING: 'Скоринг',
   INFO: 'Нужны данные',
   SUCCESS: 'Одобрено',
+  OFFER: 'Есть предложение',
   AWAITING_DISBURSEMENT: 'Ожидает выдачи',
   COMPLETED: 'Исполнена',
   REJECTED: 'Отклонено',
@@ -30,23 +32,13 @@ const formatDate = (value) =>
     minute: '2-digit',
   }).format(new Date(value))
 
-function AdminApplicationsTable({ applications, onOpen }) {
+function AdminApplicationsTable({ applications, loading, onDateFilter, onOpen }) {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('all')
   const [dateDraft, setDateDraft] = useState({ from: '', to: '' })
-  const [dateFilter, setDateFilter] = useState({ from: '', to: '' })
-
-  // Имитирует набор, который позднее будет возвращать бэкенд с dateFrom/dateTo.
-  const backendFilteredApplications = applications.filter((application) => {
-    const createdDate = application.createdAt.slice(0, 10)
-    return (
-      (!dateFilter.from || createdDate >= dateFilter.from) &&
-      (!dateFilter.to || createdDate <= dateFilter.to)
-    )
-  })
 
   const normalizedSearch = search.trim().toLowerCase()
-  const visibleApplications = backendFilteredApplications.filter((application) => {
+  const visibleApplications = applications.filter((application) => {
     const matchesStatus = status === 'all' || application.status === status
     const matchesSearch =
       !normalizedSearch ||
@@ -58,16 +50,16 @@ function AdminApplicationsTable({ applications, onOpen }) {
     return matchesStatus && matchesSearch
   })
 
-  const applyDateFilter = (event) => {
+  const applyDateFilter = async (event) => {
     event.preventDefault()
-    setDateFilter(dateDraft)
+    await onDateFilter(dateDraft)
   }
 
   const resetFilters = () => {
     setSearch('')
     setStatus('all')
     setDateDraft({ from: '', to: '' })
-    setDateFilter({ from: '', to: '' })
+    onDateFilter()
   }
 
   return (
@@ -108,8 +100,8 @@ function AdminApplicationsTable({ applications, onOpen }) {
               }
             />
           </label>
-          <Button type="submit" view="secondary" size={48}>
-            Применить даты
+          <Button type="submit" view="secondary" size={48} disabled={loading}>
+            {loading ? 'Загружаем…' : 'Применить даты'}
           </Button>
         </form>
 
@@ -138,6 +130,7 @@ function AdminApplicationsTable({ applications, onOpen }) {
       </div>
 
       <div className="admin-table-card">
+        {loading && <div className="admin-table-loading">Загружаем заявки…</div>}
         <div className="admin-table-scroll">
           <table className="admin-table">
             <thead>
@@ -161,7 +154,7 @@ function AdminApplicationsTable({ applications, onOpen }) {
                     <small>{application.inn}</small>
                   </td>
                   <td>
-                    <strong>{application.purpose}</strong>
+                    <strong>{getCreditPurposeLabel(application.purpose)}</strong>
                     <small>{formatMoney(application.creditSum)}</small>
                   </td>
                   <td>
@@ -181,7 +174,7 @@ function AdminApplicationsTable({ applications, onOpen }) {
           </table>
         </div>
 
-        {visibleApplications.length === 0 && (
+        {!loading && visibleApplications.length === 0 && (
           <div className="admin-table-empty">
             <strong>Заявки не найдены</strong>
             <p>Измените параметры поиска или сбросьте фильтры.</p>

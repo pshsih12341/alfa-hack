@@ -1,10 +1,13 @@
+import { useState } from 'react'
 import { Button } from '@alfalab/core-components-button'
+import { getCreditPurposeLabel } from '../../data/creditPurposes'
 
 const statusLabels = {
   PRESCORING: 'Прескоринг',
   SCORING: 'Скоринг',
   INFO: 'Нужны данные',
   SUCCESS: 'Одобрено',
+  OFFER: 'Есть предложение',
   AWAITING_DISBURSEMENT: 'Ожидает выдачи',
   COMPLETED: 'Исполнена',
   REJECTED: 'Отклонено',
@@ -30,9 +33,19 @@ const formatShortDate = (value) =>
   }).format(new Date(value))
 
 function AdminApplicationDetails({ application, onBack, onComplete }) {
+  const [completing, setCompleting] = useState(false)
   const hasDecision = ['SUCCESS', 'AWAITING_DISBURSEMENT', 'COMPLETED'].includes(
     application.status,
   )
+
+  const completeApplication = async () => {
+    setCompleting(true)
+    try {
+      await onComplete(application.id)
+    } finally {
+      setCompleting(false)
+    }
+  }
 
   return (
     <section className="admin-application-details">
@@ -51,6 +64,26 @@ function AdminApplicationDetails({ application, onBack, onComplete }) {
         </span>
       </header>
 
+      {application.status === 'AWAITING_DISBURSEMENT' && (
+        <article className="admin-complete-action admin-complete-action_top">
+          <div>
+            <strong>Проверьте платёжные поручения</strong>
+            <p>
+              После фактической выдачи средств отметьте заявку исполненной.
+            </p>
+          </div>
+          <Button
+            type="button"
+            view="accent"
+            size={48}
+            disabled={completing}
+            onClick={completeApplication}
+          >
+            {completing ? 'Сохраняем…' : 'Заявка исполнена'}
+          </Button>
+        </article>
+      )}
+
       <div className="admin-details-grid">
         <article className="admin-details-card">
           <h2>Данные клиента</h2>
@@ -65,7 +98,7 @@ function AdminApplicationDetails({ application, onBack, onComplete }) {
         <article className="admin-details-card">
           <h2>Параметры заявки</h2>
           <dl>
-            <DetailsRow label="Цель" value={application.purpose} />
+            <DetailsRow label="Цель" value={getCreditPurposeLabel(application.purpose)} />
             <DetailsRow label="Запрошенная сумма" value={formatMoney(application.creditSum)} />
             <DetailsRow label="Создана" value={formatDate(application.createdAt)} />
             <DetailsRow label="Обновлена" value={formatDate(application.updatedAt)} />
@@ -73,15 +106,18 @@ function AdminApplicationDetails({ application, onBack, onComplete }) {
         </article>
 
         {hasDecision && (
-          <article className="admin-details-card admin-details-card_wide">
+          <article className="admin-details-card admin-details-card_wide admin-details-card_payment">
             <h2>Решение</h2>
             <dl>
-              <DetailsRow label="Продукт" value={application.product} />
+              <DetailsRow label="Продукт" value={application.product?.product} />
               <DetailsRow
                 label="Одобренный лимит"
                 value={formatMoney(application.approvedLimit)}
               />
-              <DetailsRow label="Ставка" value={`${application.rate}% годовых`} />
+              <DetailsRow
+                label="Ставка"
+                value={application.product ? `${application.product.rate}% годовых` : '—'}
+              />
             </dl>
           </article>
         )}
@@ -122,25 +158,6 @@ function AdminApplicationDetails({ application, onBack, onComplete }) {
           </article>
         )}
 
-        {application.status === 'AWAITING_DISBURSEMENT' && (
-          <article className="admin-complete-action admin-details-card_wide">
-            <div>
-              <strong>Проверьте платёжные поручения</strong>
-              <p>
-                После фактической выдачи средств отметьте заявку исполненной.
-              </p>
-            </div>
-            <Button
-              type="button"
-              view="accent"
-              size={48}
-              onClick={() => onComplete(application.id)}
-            >
-              Заявка исполнена
-            </Button>
-          </article>
-        )}
-
         {application.status === 'COMPLETED' && (
           <div className="admin-completed-message admin-details-card_wide">
             <span>✓</span>
@@ -151,23 +168,21 @@ function AdminApplicationDetails({ application, onBack, onComplete }) {
           </div>
         )}
 
-        <article className="admin-details-card admin-details-card_wide">
+        <article className="admin-details-card admin-details-card_wide admin-details-card_history">
           <h2>История статуса</h2>
           <div className="admin-status-history">
-            <div>
-              <i />
-              <span>
-                <strong>Заявка создана</strong>
-                <small>{formatDate(application.createdAt)}</small>
-              </span>
-            </div>
-            <div className="active">
-              <i />
-              <span>
-                <strong>{statusLabels[application.status] || application.status}</strong>
-                <small>{formatDate(application.updatedAt)}</small>
-              </span>
-            </div>
+            {application.statusHistory.map((historyItem, index) => (
+              <div
+                className={index === application.statusHistory.length - 1 ? 'active' : undefined}
+                key={`${historyItem.status}-${historyItem.createdAt}`}
+              >
+                <i />
+                <span>
+                  <strong>{statusLabels[historyItem.status] || historyItem.status}</strong>
+                  <small>{formatDate(historyItem.createdAt)}</small>
+                </span>
+              </div>
+            ))}
           </div>
         </article>
       </div>

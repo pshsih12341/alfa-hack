@@ -5,19 +5,28 @@ import { Input } from '@alfalab/core-components-input'
 import { PhoneInput } from '@alfalab/core-components-phone-input'
 import { Select } from '@alfalab/core-components-select'
 import Logo from '../components/Logo'
-import { creditPurposeOptions, getCreditPurpose } from '../data/creditPurposes'
+import { creditPurposeOptions } from '../data/creditPurposes'
 import './RegistrationPage.css'
 
 const initialForm = {
   phoneNumber: '',
   creditSum: null,
   purpose: '',
+  termMonths: 24,
   inn: '',
+  bkiConsent: false,
 }
+
+const termOptions = [6, 12, 18, 24, 30, 36].map((months) => ({
+  key: String(months),
+  content: `${months} месяцев`,
+}))
 
 function RegistrationPage({ initialMode = 'registration', onAuthenticated }) {
   const [mode, setMode] = useState(initialMode)
   const [form, setForm] = useState(initialForm)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
   const isFormComplete =
     mode === 'login'
       ? Boolean(form.phoneNumber)
@@ -25,7 +34,9 @@ function RegistrationPage({ initialMode = 'registration', onAuthenticated }) {
           form.phoneNumber &&
             form.creditSum &&
             form.purpose &&
-            form.inn,
+            form.termMonths &&
+            form.inn &&
+            form.bkiConsent,
         )
 
   const setField = (field, value) => {
@@ -34,20 +45,21 @@ function RegistrationPage({ initialMode = 'registration', onAuthenticated }) {
 
   const changeMode = (nextMode) => {
     setMode(nextMode)
+    setError('')
   }
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault()
+    setError('')
+    setSubmitting(true)
 
-    if (mode === 'login') {
-      onAuthenticated({ phoneNumber: form.phoneNumber, isAdmin: true })
-      return
+    try {
+      await onAuthenticated(form, mode)
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setSubmitting(false)
     }
-
-    onAuthenticated({
-      ...form,
-      purpose: getCreditPurpose(form.purpose),
-    })
   }
 
   return (
@@ -120,15 +132,21 @@ function RegistrationPage({ initialMode = 'registration', onAuthenticated }) {
               <RegistrationFields form={form} setField={setField} />
             )}
 
+            {error && <div className="form-error">{error}</div>}
+
             <Button
               className="submit-button"
               type="submit"
               view="accent"
               size={56}
               block
-              disabled={!isFormComplete}
+              disabled={!isFormComplete || submitting}
             >
-              {mode === 'registration' ? 'Отправить заявку' : 'Войти'}
+              {submitting
+                ? 'Отправляем…'
+                : mode === 'registration'
+                  ? 'Отправить заявку'
+                  : 'Войти'}
             </Button>
 
             {mode === 'registration' && (
@@ -168,6 +186,17 @@ function RegistrationFields({ form, setField }) {
         onChange={({ selected }) => setField('purpose', selected?.key ?? '')}
       />
 
+      <Select
+        block
+        size={56}
+        label="Срок кредита"
+        options={termOptions}
+        selected={String(form.termMonths)}
+        onChange={({ selected }) =>
+          setField('termMonths', Number(selected?.key || 24))
+        }
+      />
+
       <Input
         block
         size={56}
@@ -180,6 +209,15 @@ function RegistrationFields({ form, setField }) {
         maxLength={12}
         required
       />
+
+      <label className="bki-consent">
+        <input
+          type="checkbox"
+          checked={form.bkiConsent}
+          onChange={(event) => setField('bkiConsent', event.target.checked)}
+        />
+        <span>Согласен на запрос кредитной истории в БКИ</span>
+      </label>
     </>
   )
 }
