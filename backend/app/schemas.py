@@ -221,6 +221,8 @@ class AdminApplicationDetails(BaseModel):
     updatedAt: datetime
     product: AdminProductOut | None = None
     approvedLimit: int | None = None
+    termMonths: int | None = None  
+    rate: float | None = None         
     paymentOrders: list[AdminPaymentOrderOut]
     statusHistory: list[AdminStatusHistoryOut]
 
