@@ -86,9 +86,17 @@ def _run_scoring_ml(application_id: str) -> None:
             "refinanceLoanIds": application.refinance_loan_ids or [],
             "revenueLast12m": application.revenue_last_12m,
             "bkiConsent": bool(application.bki_consent),
+            "hasCollateral": bool(application.has_collateral),
             "useAlfaAccount": False,
             "statements": None,
         }
+
+        if application.additional_info:
+            info = application.additional_info
+            if info.get("useAlfaAccount"):          # 12 пробелов (внутри if)
+                payload["useAlfaAccount"] = True
+            if info.get("statements"):              # 12 пробелов (внутри if)
+                payload["statements"] = info["statements"]
 
     # вызываем ML
     try:

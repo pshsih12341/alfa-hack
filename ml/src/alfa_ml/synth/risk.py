@@ -55,6 +55,8 @@ def risk_drivers(batch, gen_cfg: dict, scoring_cfg: dict) -> pd.DataFrame:
             + c["tax_debt"] * tax_debt
             + track.map(c["track_record"])
             + c["top_customer"] * truth["top_customer_share"]
+            + apps["purpose"].map(c["purpose"])
+            + c["collateral"] * apps["has_collateral"]
             + inter["young_leverage"] * (truth["age_months"] < 12) * np.log1p(3 * leverage)
             + inter["tax_debt_severe_dpd"] * tax_debt * dpd.isin(["30-89", "90+"])
             + gen_cfg["risk"]["latent_noise_sd"] * truth["latent"])
@@ -65,11 +67,12 @@ def risk_drivers(batch, gen_cfg: dict, scoring_cfg: dict) -> pd.DataFrame:
         "existing_payments": external.existing_payments(loans, ids),
         "amount": apps["requested_amount"],
         "term": apps["term_months"],
+        "has_collateral": apps["has_collateral"],
     })
 
 
 def true_pd(drivers: pd.DataFrame, intercept: float, gen_cfg: dict, scoring_cfg: dict):
-    """PD и ставка кредита. Ставка зависит от PD, а PD — от платежа по этой ставке: один шаг уточнения."""
+    """PD и ставка кредита. Ставка зависит от PD и залога, а PD — от платежа по этой ставке: один шаг уточнения."""
     c = gen_cfg["risk"]["coefficients"]
     vol_low_dscr = gen_cfg["risk"]["interactions"]["volatility_low_dscr"]
     base = drivers["base"].to_numpy()
@@ -78,6 +81,7 @@ def true_pd(drivers: pd.DataFrame, intercept: float, gen_cfg: dict, scoring_cfg:
     existing = drivers["existing_payments"].to_numpy()
     amount = drivers["amount"].to_numpy()
     term = drivers["term"].to_numpy()
+    collateral = drivers["has_collateral"].to_numpy(dtype=bool)
 
     def logit(rate):
         dscr = flow / (annuity_payment(amount, rate, term) + existing)
@@ -85,7 +89,9 @@ def true_pd(drivers: pd.DataFrame, intercept: float, gen_cfg: dict, scoring_cfg:
         return (intercept + base + c["log_dscr"] * np.log(np.clip(dscr, 0.2, 5.0)) + c["dscr_below_1"] * below_1
                 + vol_low_dscr * volatility * below_1)
 
-    rate = rate_for_pd(sigmoid(logit(REFERENCE_RATE)), scoring_cfg["rate_buckets"])
+    first = sigmoid(logit(REFERENCE_RATE))
+    rate = np.where(collateral, rate_for_pd(first, scoring_cfg["collateral_rate_buckets"]),
+                    rate_for_pd(first, scoring_cfg["rate_buckets"]))
     return sigmoid(logit(rate)), rate
 
 

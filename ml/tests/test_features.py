@@ -40,6 +40,8 @@ def _data():
         "term_months": 12,
         "declared_revenue": [5e6, 5e6, 3e6, 4e6, 6e6],
         "refinance_loan_ids": [[10], [], [], [], []],
+        "purpose": ["refinancing", "working_capital", "equipment", "current_expenses", "real_estate"],
+        "has_collateral": [False, False, True, False, True],
     })
     companies = pd.DataFrame({
         "application_id": [1, 2, 3, 4, 5],
@@ -149,6 +151,7 @@ def test_model1_matrix(prof):
     assert x1.loc[2, "loan_to_revenue"] == pytest.approx(0.5)
     assert x1["has_tax_debt"].tolist() == [0, 1, 0, 0, 0]  # 9 тыс. — ниже порога 10 тыс.
     assert np.isnan(x1.loc[3, "max_dpd_24m"])  # истории нет — пропуск, а не 0
+    assert x1.loc[3, "purpose"] == "equipment" and x1["has_collateral"].tolist() == [0, 0, 1, 0, 1]
 
 
 @pytest.fixture(scope="module")

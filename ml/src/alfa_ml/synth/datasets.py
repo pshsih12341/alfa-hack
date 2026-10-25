@@ -70,7 +70,8 @@ def random_dates(rng: np.random.Generator, n: int, first: str, last: str) -> pd.
     return pd.DatetimeIndex(start + pd.to_timedelta(rng.integers(0, days, n), unit="D")).normalize()
 
 
-def generate_segment(segment: Segment, period: tuple[str, str], ctx: Context, rng: np.random.Generator) -> Batch:
+def generate_segment(segment: Segment, period: tuple[str, str], ctx: Context, rng: np.random.Generator,
+                     detail_rng: np.random.Generator) -> Batch:
     cfg, scoring = segment.config, ctx.scoring_cfg
     n = segment.size
     ids = ctx.app_ids.take(n)
@@ -89,7 +90,7 @@ def generate_segment(segment: Segment, period: tuple[str, str], ctx: Context, rn
     anomalies.apply_stop_rules(pop, reasons, dates, scoring, rng)
     registry_events(pop, dates, rng)
 
-    applications = generate_applications(ids, dates, pop, cfg, scoring, rng)
+    applications = generate_applications(ids, dates, pop, cfg, scoring, rng, detail_rng)
     monthly = generate_monthly_flows(pop, dates, cfg, rng, one_off=outliers == "one_off_contract",
                                      shocked=np.full(n, segment.shock is not None), shock=segment.shock or {})
     labels = pd.DataFrame({
@@ -109,7 +110,9 @@ def build_sample(segments: list[Segment], period: tuple[str, str], ctx: Context,
                  intercept: float | None = None) -> tuple[Batch, float]:
     """Выборка с дефолтами. Без intercept свободный член калибруется на ней под целевую долю дефолтов."""
     rng = np.random.default_rng(seed)
-    batch = Batch.concat([generate_segment(s, period, ctx, rng) for s in segments])
+    # Цель, срок и залог заявки — отдельным потоком: их можно менять, не трогая компании и обороты.
+    detail_rng = np.random.default_rng(seed.spawn(1)[0])
+    batch = Batch.concat([generate_segment(s, period, ctx, rng, detail_rng) for s in segments])
     drivers = risk.risk_drivers(batch, ctx.gen_cfg, ctx.scoring_cfg)
     batch.labels["cycle_shift"] = risk.cycle_shift(batch.applications["application_date"], ctx.gen_cfg)
     drivers["base"] += (batch.labels["intercept_shift"] + batch.labels["cycle_shift"]).to_numpy()

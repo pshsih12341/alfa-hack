@@ -1,17 +1,24 @@
 """HTTP-сервис поверх SQLite-моков: те же данные, что увидит бэкенд в compose."""
+import base64
+
 import numpy as np
 import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
+from alfa_ml.artifacts import load_seasonality
 from alfa_ml.config import load_config
-from alfa_ml.decision.heuristic import MODEL_VERSION
+from alfa_ml.models.scorecard import MODEL1_FILE, MODEL2_FILE, load_model
+from alfa_ml.decision.stage1 import Application
+from alfa_ml.decision.stage2 import decide_stage2
 from alfa_ml.features.build import okved_group, revenue_source
 from alfa_ml.service.app import create_app
 from alfa_ml.service.settings import Settings
 from alfa_ml.sources.export import export_database, sqlite_engine
+from alfa_ml.sources.read import read_sources
 from alfa_ml.synth.datasets import Context, Segment, build_sample
 from alfa_ml.synth.ids import IdCounter, InnFactory
+from alfa_ml.synth.onec_files import statement_file
 
 AS_OF = "2026-11-01"
 SCORING = load_config("scoring")
@@ -40,7 +47,8 @@ def client(engine):
 def test_health_reports_snapshot_date(client):
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "database": "ok", "asOf": AS_OF, "modelVersion": MODEL_VERSION}
+    assert response.json() == {"status": "ok", "database": "ok", "asOf": AS_OF,
+                               "modelVersion": f"{load_model(MODEL1_FILE).version}; {load_model(MODEL2_FILE).version}"}
 
 
 def test_health_degraded_without_database(tmp_path):
@@ -122,13 +130,13 @@ def test_openapi_lists_endpoints(client):
 
 
 def _request(app_row, **overrides):
-    purpose = app_row["purpose"] if app_row["purpose"] in SCORING["purposes"] else "working_capital"
+    purpose = app_row["purpose"]
     body = {
         "applicationId": f"app-{app_row['application_id']}", "inn": app_row["inn"],
         "creditSum": int(app_row["requested_amount"]), "termMonths": int(app_row["term_months"]),
         "purpose": purpose, "refinanceLoanIds": list(app_row["refinance_loan_ids"]) if purpose == "refinancing" else [],
         "revenueLast12m": float(app_row["declared_revenue"]), "bkiConsent": True,
-        "useAlfaAccount": False, "statements": None,
+        "hasCollateral": bool(app_row["has_collateral"]), "useAlfaAccount": False, "statements": None,
     }
     body.update(overrides)
     return body
@@ -158,7 +166,11 @@ def test_score_decisions_follow_the_rules(scored):
         assert body["stopRules"] == []
         if body["decision"] == "APPROVED":
             assert body["approved"]["creditSum"] == requested and body["approved"]["termMonths"] == row["term_months"]
-            assert body["pd"] < 0.05 and body["rate"] in (18.0, 20.0) and body["product"] == "no_collateral"
+            assert body["pd"] < 0.05
+            if row["has_collateral"]:
+                assert body["rate"] in (17.5, 18.5) and body["product"] == "collateral"
+            else:
+                assert body["rate"] in (18.0, 20.0) and body["product"] == "no_collateral"
         elif body["decision"] == "OFFER":
             maxima = {t["termMonths"]: t["maxSum"] for t in body["maxByTerm"]}
             assert 1 <= len(body["offers"]) <= 2 and body["documentsRequired"]
@@ -175,7 +187,7 @@ def test_request_and_response_field_names_match_contract(client):
     schemas = client.get("/openapi.json").json()["components"]["schemas"]
     assert set(schemas["ScoreRequest"]["properties"]) == {
         "applicationId", "inn", "creditSum", "termMonths", "purpose", "refinanceLoanIds", "revenueLast12m",
-        "bkiConsent", "useAlfaAccount", "statements"}
+        "bkiConsent", "hasCollateral", "useAlfaAccount", "statements"}
     assert set(schemas["ScoreResponse"]["properties"]) == {
         "decision", "stage", "product", "pd", "rate", "approved", "offers", "maxByTerm", "limit", "termLimit",
         "documentsRequired", "clientMessage", "reasons", "stopRules", "modelVersion"}
@@ -209,7 +221,9 @@ def test_score_is_deterministic(client, scored):
     ({"purpose": "other"}, 422),
     ({"refinanceLoanIds": [1]}, 422),
     ({"purpose": "refinancing", "refinanceLoanIds": [999_999_999]}, 422),
-    ({"useAlfaAccount": True}, 501),
+    ({"statements": [{"fileName": "x.txt", "content": "не base64!"}]}, 422),
+    ({"statements": [{"fileName": "x.txt", "content": base64.b64encode("просто текст".encode()).decode()}]}, 422),
+    ({"statements": [{"fileName": f"{i}.txt", "content": ""} for i in range(6)]}, 422),
     ({"inn": "7707083893"}, 404),
     ({"inn": "123"}, 422),
     ({"revenueLast12m": 0}, 422),
@@ -217,6 +231,71 @@ def test_score_is_deterministic(client, scored):
 def test_score_validation(client, scored, override, status):
     row, _ = scored[0]
     assert client.post("/score", json=_request(row, **override)).status_code == status
+
+
+def test_collateral_and_property_purpose(client, scored):
+    """С залогом — продукт collateral, PD и ставка ниже; покупка имущества — допустимая цель."""
+    row, body = next((r, b) for r, b in scored if b["decision"] == "APPROVED" and not r["has_collateral"])
+    secured = client.post("/score", json=_request(row, hasCollateral=True)).json()
+    assert secured["decision"] == "APPROVED" and secured["product"] == "collateral"
+    assert secured["pd"] < body["pd"] and secured["rate"] < body["rate"]
+    assert client.post("/score", json=_request(row, purpose="property", refinanceLoanIds=[])).status_code == 200
+
+
+def _stage2_candidate(batch, alfa: bool):
+    """Действующая компания без стоп-правил с годом оборотов."""
+    labels = batch.labels.set_index("application_id")
+    months = batch.monthly.groupby("application_id").size()
+    for _, org in batch.companies.iterrows():
+        app_id = org["application_id"]
+        if bool(org["is_alfa_client"]) == alfa and labels.loc[app_id, "heuristic_reason"] == "" \
+                and months.get(app_id, 0) == 12:
+            row = _app_row(batch, app_id)
+            row["application_id"] = app_id
+            return org, row
+    raise AssertionError("нет подходящей компании")
+
+
+def _file_for(batch, org) -> str:
+    persons = batch.persons[(batch.persons["application_id"] == org["application_id"]) & batch.persons["is_director"]]
+    monthly = batch.monthly[batch.monthly["application_id"] == org["application_id"]]
+    raw = statement_file(monthly, org["inn"], org["name"], org["legal_form"],
+                         {"inn": persons["inn"].iloc[0], "name": persons["name"].iloc[0]}, AS_OF)
+    return base64.b64encode(raw).decode()
+
+
+def test_stage2_with_alfa_account(client, batch):
+    org, row = _stage2_candidate(batch, alfa=True)
+    body = client.post("/score", json=_request(row, useAlfaAccount=True)).json()
+    assert body["stage"] == 2 and body["decision"] in {"APPROVED", "OFFER", "REJECTED"}
+    assert body["documentsRequired"] is None and "Выручка по выпискам" in body["reasons"][0]
+
+
+def test_stage2_file_upload_matches_direct_calculation(client, batch, engine):
+    """Решение по загруженному файлу 1С совпадает с решением по тем же помесячным суммам напрямую."""
+    org, row = _stage2_candidate(batch, alfa=False)
+    files = [{"fileName": f"{org['inn']}.txt", "content": _file_for(batch, org)}]
+    body = client.post("/score", json=_request(row, statements=files)).json()
+    with engine.connect() as conn:
+        src = read_sources(conn, org["inn"], AS_OF)
+    monthly = batch.monthly[batch.monthly["application_id"] == org["application_id"]]
+    refinance = tuple(int(i) for i in row["refinance_loan_ids"]) if row["purpose"] == "refinancing" else ()
+    app = Application(int(row["requested_amount"]), int(row["term_months"]), row["purpose"], refinance,
+                      float(row["declared_revenue"]), bool(row["has_collateral"]))
+    direct = decide_stage2(src, monthly, app, AS_OF, SCORING, load_config("rules"), load_seasonality(SCORING))
+    assert body["stage"] == 2 and body["decision"] == direct.decision
+    assert body["pd"] == pytest.approx(direct.pd, abs=1e-4)
+
+
+def test_stage2_rejects_wrong_sources(client, batch):
+    org, row = _stage2_candidate(batch, alfa=False)
+    # Счёт в Альфе есть только у клиентов Альфы.
+    assert client.post("/score", json=_request(row, useAlfaAccount=True)).status_code == 422
+    # Выписка чужой компании.
+    other, _ = _stage2_candidate(batch, alfa=True)
+    files = [{"fileName": "other.txt", "content": _file_for(batch, other)}]
+    response = client.post("/score", json=_request(row, statements=files))
+    assert response.status_code == 422 and "не по счёту этого клиента" in response.json()["detail"]
 
 
 def test_score_asks_revenue_when_unknown(client, batch):

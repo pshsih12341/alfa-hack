@@ -11,6 +11,7 @@ ALLOWED_PURPOSES = {
     "working_capital",
     "current_expenses",
     "refinancing",
+    "property",
 }
 
 ALLOWED_TERM_MONTHS = {6, 12, 18, 24, 30, 36}
@@ -28,6 +29,7 @@ class RegisterRequest(BaseModel):
     bkiConsent: bool
     refinanceLoanIds: list[int] = Field(default_factory=list)
     companyName: str | None = None
+    hasCollateral: bool = False
 
 
 class LoginRequest(BaseModel):
@@ -73,6 +75,7 @@ class ApplicationCreateRequest(BaseModel):
     creditSum: int = Field(ge=0)
     purpose: str
     termMonths: int
+    hasCollateral: bool = False
 
 
 class LimitRange(BaseModel):

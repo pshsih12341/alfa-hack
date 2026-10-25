@@ -65,6 +65,7 @@ def register(payload: RegisterRequest, background: BackgroundTasks):
             number=1,
             status="PRESCORING",
             credit_sum=payload.creditSum,
+            has_collateral=payload.hasCollateral,
             purpose=payload.purpose,
             requested_term_months=payload.termMonths, 
             revenue_last_12m=payload.revenueLast12m,

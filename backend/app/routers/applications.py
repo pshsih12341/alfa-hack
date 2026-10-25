@@ -86,6 +86,7 @@ def create_application(
     payload: ApplicationCreateRequest,
     background: BackgroundTasks,
     user: models.User = Depends(get_current_user),
+
 ):
     if payload.purpose not in ALLOWED_PURPOSES:
         raise HTTPException(status_code=400, detail="Недопустимая цель кредита")
@@ -108,6 +109,7 @@ def create_application(
             credit_sum=payload.creditSum,
             purpose=payload.purpose,
             requested_term_months=payload.termMonths,
+            has_collateral=payload.hasCollateral,
         )
         db.add(application)
         db.flush()

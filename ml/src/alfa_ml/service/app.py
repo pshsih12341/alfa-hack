@@ -1,8 +1,11 @@
 """HTTP-сервис скоринга: решение по заявке, карточка компании и её кредиты из баз-моков.
 
 Запуск: uvicorn alfa_ml.service.app:app --host 0.0.0.0 --port 8001
-Контракт POST /score согласован с бэкендом; этап 2 (выписки) — следующий шаг.
+Контракт POST /score согласован с бэкендом. Этап 1 — без выписок; этап 2 — с оборотами
+по счёту в Альфе (useAlfaAccount) и/или выписками из других банков (statements, файлы 1С).
 """
+import base64
+import binascii
 import datetime as dt
 import json
 import logging
@@ -16,14 +19,22 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 from sqlalchemy import Engine, text
 
+from alfa_ml.artifacts import load_seasonality
 from alfa_ml.config import load_config
-from alfa_ml.decision.heuristic import MODEL_VERSION
-from alfa_ml.decision.stage1 import Application, Decision, Option, RevenueRequired, decide_stage1
+from alfa_ml.decision.stage1 import Application, Decision, Option, RevenueRequired, decide_stage1, product
+from alfa_ml.decision.stage2 import decide_stage2
 from alfa_ml.features.build import okved_group, revenue_source
 from alfa_ml.inn import is_valid_inn
+from alfa_ml.models.scorecard import MODEL1_FILE, MODEL2_FILE, load_model
 from alfa_ml.service.db import make_engine, snapshot_date
 from alfa_ml.service.settings import Settings
 from alfa_ml.sources.read import SourceData, read_sources
+from alfa_ml.statements.categorize import categorize, client_share, combine, monthly_aggregates
+from alfa_ml.statements.onec import StatementFormatError, parse
+
+MAX_STATEMENT_FILES = 5
+MAX_STATEMENT_BYTES = 5 * 1024 * 1024
+MIN_CLIENT_SHARE = 0.9  # доля платёжек с ИНН клиента: меньше — выписка не этого клиента
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 decision_log = logging.getLogger("alfa_ml.decisions")
@@ -90,6 +101,7 @@ class ScoreRequest(ApiModel):
     term_months: int
     purpose: str
     refinance_loan_ids: list[int] = []
+    has_collateral: bool = False  # клиент готов предоставить залог: продукт collateral, ставки ниже
     # Имя задано явно: генератор псевдонимов сделал бы revenueLast12M, а в контракте revenueLast12m.
     revenue_last12m: float | None = Field(default=None, gt=0, alias="revenueLast12m")  # None — есть в источниках
     bki_consent: bool
@@ -147,6 +159,8 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
     engine = engine or make_engine(settings.database_url)
     scoring_cfg = load_config("scoring")
     rules_cfg = load_config("rules")
+    seasonality = load_seasonality(scoring_cfg)
+    model1, model2 = load_model(MODEL1_FILE), load_model(MODEL2_FILE)
     terms = scoring_cfg["terms_months"]
     amount_limit = Limits(min=scoring_cfg["min_amount"], max=scoring_cfg["max_amount"], step=scoring_cfg["amount_step"])
     term_limit = Limits(min=terms[0], max=terms[-1], step=terms[1] - terms[0])
@@ -180,8 +194,8 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
         """Проверки заявки, которые не зависят от данных источников."""
         if not request.bki_consent:
             raise HTTPException(status_code=422, detail="Без согласия на запрос в БКИ скоринг невозможен")
-        if request.use_alfa_account or request.statements:
-            raise HTTPException(status_code=501, detail="Этап 2 (выписки) ещё не реализован")
+        if request.statements and len(request.statements) > MAX_STATEMENT_FILES:
+            raise HTTPException(status_code=422, detail=f"Не больше {MAX_STATEMENT_FILES} файлов выписок")
         if request.term_months not in terms:
             raise HTTPException(status_code=422, detail=f"Срок должен быть одним из {terms} месяцев")
         if not amount_limit.min <= request.credit_sum <= amount_limit.max:
@@ -197,7 +211,8 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
         try:
             with engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
-                return Health(status="ok", database="ok", as_of=as_of(conn), model_version=MODEL_VERSION)
+                return Health(status="ok", database="ok", as_of=as_of(conn),
+                              model_version=f"{model1.version}; {model2.version}")
         except Exception:
             body = Health(status="degraded", database="error", as_of=None)
             return JSONResponse(status_code=503, content=body.model_dump(mode="json", by_alias=True))
@@ -213,12 +228,18 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
             raise HTTPException(status_code=422,
                                 detail=f"Кредитов {sorted(unknown)} нет среди бизнес-кредитов заёмщика в БКИ")
         application = Application(request.credit_sum, request.term_months, request.purpose,
-                                   tuple(request.refinance_loan_ids), request.revenue_last12m)
-        try:
-            decision = decide_stage1(data, application, date, scoring_cfg, rules_cfg)
-        except RevenueRequired as error:
-            raise HTTPException(status_code=422, detail=f"{error} (revenueLast12m)") from error
-        response = _score_response(decision)
+                                   tuple(request.refinance_loan_ids), request.revenue_last12m, request.has_collateral)
+        if request.use_alfa_account or request.statements:
+            statements = statement_months(request, data, date)
+            decision = decide_stage2(data, statements, application, date, scoring_cfg, rules_cfg, seasonality,
+                                     model2.predict_pd, model2.version)
+        else:
+            try:
+                decision = decide_stage1(data, application, date, scoring_cfg, rules_cfg,
+                                         model1.predict_pd, model1.version)
+            except RevenueRequired as error:
+                raise HTTPException(status_code=422, detail=f"{error} (revenueLast12m)") from error
+        response = _score_response(decision, product(application))
         decision_log.info(json.dumps({
             "applicationId": request.application_id, "inn": request.inn, "asOf": date.isoformat(),
             "decision": decision.decision, "pd": decision.pd, "stopRules": decision.stop_rules,
@@ -226,13 +247,37 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
         }, ensure_ascii=False))
         return response
 
-    def _score_response(decision: Decision) -> ScoreResponse:
+    def statement_months(request: ScoreRequest, data: SourceData, date: dt.date) -> pd.DataFrame:
+        """Помесячные обороты для этапа 2: счёт в Альфе и/или файлы 1С из других банков, сложенные по месяцам."""
+        parts = []
+        if request.use_alfa_account:
+            if not bool(data.companies["is_alfa_client"].iloc[0]):
+                raise HTTPException(status_code=422, detail="useAlfaAccount — только для клиентов Альфы: "
+                                                            "загрузите выписки файлами (statements)")
+            parts.append(data.monthly)
+        for file in request.statements or []:
+            try:
+                raw = base64.b64decode(file.content, validate=True)
+            except (binascii.Error, ValueError) as error:
+                raise HTTPException(status_code=422, detail=f"{file.file_name}: content — не base64") from error
+            if len(raw) > MAX_STATEMENT_BYTES:
+                raise HTTPException(status_code=422, detail=f"{file.file_name}: файл больше 5 МБ")
+            try:
+                statement = parse(raw)
+            except StatementFormatError as error:
+                raise HTTPException(status_code=422, detail=f"{file.file_name}: {error}") from error
+            if client_share(statement, request.inn) < MIN_CLIENT_SHARE:
+                raise HTTPException(status_code=422, detail=f"{file.file_name}: выписка не по счёту этого клиента")
+            parts.append(monthly_aggregates(categorize(statement, request.inn), 0, date))
+        return combine(*parts)
+
+    def _score_response(decision: Decision, product_key: str) -> ScoreResponse:
         approved = _offer_out(decision.approved)
         offers = [_offer_out(option) for option in decision.offers]
         chosen = approved or (offers[0] if offers else None)
         return ScoreResponse(
             decision=decision.decision, stage=decision.stage,
-            product=scoring_cfg["product"] if decision.decision in ("APPROVED", "OFFER") else None,
+            product=product_key if decision.decision in ("APPROVED", "OFFER") else None,
             pd=None if decision.pd is None else round(decision.pd, 4),
             rate=chosen.rate if chosen else None,
             approved=approved, offers=offers,

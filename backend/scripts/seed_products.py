@@ -26,20 +26,14 @@ COMMON_PURPOSES = [
 def _load_products() -> list[Product]:
     return [
         Product(
-            code="no_collateral",
-            product_name="Кредит для бизнеса без залога",
+            code="collateral",
+            product_name="Кредит для бизнеса под залог",
             purpose=COMMON_PURPOSES,
-            rate=19,
-            limit_min=100_000,
-            limit_max=30_000_000,
-            term_min=6,
-            term_max=36,
-            term_step=6,
-            business_type="LLC",
-            with_collateral=False,
+            rate=18, 
+            limit_min=100_000, limit_max=100_000_000,
+            term_min=6, term_max=60, term_step=6,
+            business_type="LLC", with_collateral=True,
         ),
-        # collateral больше не выбирается скорингом (ML: продукта под залог нет).
-        # Оставлен для совместимости со старыми заявками; seed его не трогает.
     ]
 
 

@@ -9,6 +9,7 @@ WORKDIR /app
 COPY pyproject.toml uv.lock .python-version ./
 RUN uv sync --frozen --no-default-groups --no-install-project
 COPY config ./config
+COPY artifacts ./artifacts
 COPY src ./src
 RUN uv sync --frozen --no-default-groups
 
