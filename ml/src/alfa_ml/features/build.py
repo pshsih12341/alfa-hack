@@ -36,6 +36,17 @@ def okved_group(codes: pd.Series, groups_cfg: dict) -> pd.Series:
     return result
 
 
+def revenue_source(is_alfa_client, statement_months, fns_revenue, min_months: int) -> np.ndarray:
+    """Откуда берётся выручка этапа 1: alfa_full, alfa_partial, fns или declared (анкета).
+
+    Приоритет: обороты в Альфе (клиент и хотя бы min_months полных месяцев) → ФНС → анкета.
+    """
+    months = np.asarray(statement_months)
+    from_alfa = np.asarray(is_alfa_client, dtype=bool) & (months >= min_months)
+    return np.select([from_alfa & (months >= 12), from_alfa, pd.notna(np.asarray(fns_revenue, dtype=float))],
+                     ["alfa_full", "alfa_partial", "fns"], "declared")
+
+
 def profile(data, scoring_cfg: dict, seasonality: pd.DataFrame) -> pd.DataFrame:
     """Профиль заявки: статичные фичи и всё, из чего считаются фичи, зависящие от условий кредита.
 
@@ -60,10 +71,9 @@ def profile(data, scoring_cfg: dict, seasonality: pd.DataFrame) -> pd.DataFrame:
     statement_revenue = (summary["total_inflow"] / months.where(months > 0) * 12).where(enough_for_revenue)
 
     # Выручка этапа 1 по приоритету: обороты в Альфе → ФНС (только ООО) → анкета.
-    from_alfa = comp["is_alfa_client"].astype(bool) & enough_for_revenue
+    source = revenue_source(comp["is_alfa_client"], months, comp["fns_revenue"], feat["revenue_min_months"])
+    from_alfa = pd.Series(np.isin(source, ["alfa_full", "alfa_partial"]), index=ids)
     revenue1 = statement_revenue.where(from_alfa, comp["fns_revenue"]).fillna(apps["declared_revenue"])
-    source = np.select([from_alfa & (months >= 12), from_alfa, comp["fns_revenue"].notna()],
-                       ["alfa_full", "alfa_partial", "fns"], "declared")
 
     margin = group.map({name: g["margin"] for name, g in groups_cfg.items()})
     groups_by_app = pd.Series(group.to_numpy(), index=ids)
