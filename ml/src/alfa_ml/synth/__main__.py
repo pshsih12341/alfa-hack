@@ -1,4 +1,4 @@
-"""Генерация синтетических выборок: uv run python -m alfa_ml.synth --out data/synth --mocks ../mocks"""
+"""Генерация синтетических выборок: uv run python -m alfa_ml.synth --out ../mocks/datasets --mocks ../mocks"""
 import argparse
 from pathlib import Path
 
