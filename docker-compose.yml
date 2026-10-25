@@ -50,6 +50,16 @@ services:
       - backend
     ports:
       - "8080:80"
+  ml:
+    build: ./ml
+    profiles: ["ml"]
+    environment:
+      ML_DATABASE_URL: postgresql://credit_kiosk:credit_kiosk@postgres:5432/mocks
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: 256m
+    restart: unless-stopped
 
 volumes:
   pgdata:
