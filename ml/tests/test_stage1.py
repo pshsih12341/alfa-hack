@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 
 from alfa_ml.config import load_config
-from alfa_ml.decision.stage1 import Application, RevenueRequired, decide_stage1
+from alfa_ml.decision.stage1 import Application, RevenueRequired, decide_stage1, percent, product
 from alfa_ml.finance import annuity_payment
 from alfa_ml.sources.read import SourceData
 
@@ -113,3 +113,15 @@ def test_revenue_required_when_unknown():
         _decide(300_000, 12, source=_source(legal_form="ip"), revenue=None)
     # У ООО с данными ФНС выручку из анкеты можно не передавать.
     assert _decide(300_000, 12, source=_source(fns_revenue=12e6), revenue=None).decision == "APPROVED"
+
+
+def test_collateral_lowers_rate():
+    app = Application(300_000, 12, "equipment", (), 12_000_000, has_collateral=True)
+    decision = decide_stage1(_source(), app, AS_OF, SCORING, RULES, predict_pd=GOOD)
+    assert decision.decision == "APPROVED" and decision.approved.rate == 0.175
+    assert product(app) == "collateral" and "под 17,5% годовых" in decision.client_message
+    assert product(Application(300_000, 12, "equipment")) == "no_collateral"
+
+
+def test_percent_for_client():
+    assert percent(0.175) == "17,5%" and percent(0.18) == "18%" and percent(0.185) == "18,5%"

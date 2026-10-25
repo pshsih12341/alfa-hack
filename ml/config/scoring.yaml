@@ -10,13 +10,22 @@ rate_buckets:
   - {max_pd: 0.07, rate: 0.20}
   - {max_pd: 0.11, rate: 0.22}
   - {max_pd: 0.15, rate: 0.24}
+# Продукт с залогом: при дефолте банк возвращает часть долга за счёт залога, потери — 25% вместо 45%
+# (допущение порядка F-IRB Базеля для обеспечения имуществом при полном покрытии).
+# Ставка = 16.7% + PD × 25% на верхней границе интервала, округлено до 0.5 п.п.
+# Отсечки PD те же: залог — второй источник погашения, а не замена способности платить из потока.
+collateral_rate_buckets:
+  - {max_pd: 0.03, rate: 0.175}
+  - {max_pd: 0.07, rate: 0.185}
+  - {max_pd: 0.11, rate: 0.195}
+  - {max_pd: 0.15, rate: 0.205}
 terms_months: [6, 12, 18, 24, 30, 36]
 min_amount: 100000
 max_amount: 30000000
 amount_step: 50000
-product: no_collateral
-# Ключи цели кредита, как на бэкенде. На решение влияет только refinancing.
-purposes: [real_estate, equipment, repair, working_capital, current_expenses, refinancing]
+# Ключи цели кредита, как на бэкенде, плюс property — покупка имущества (транспорт, техника).
+# Цель — фича моделей; refinancing ещё и убирает отмеченные кредиты из долга и платежей.
+purposes: [real_estate, property, equipment, repair, working_capital, current_expenses, refinancing]
 max_offers: 2
 offer_validity_days: 10
 
