@@ -9,7 +9,7 @@ services:
       - pgdata:/var/lib/postgresql/data
       - ./mocks/mocks_postgres.sql:/docker-entrypoint-initdb.d/20_mocks.sql:ro
     ports:
-      - "5433:5432"          # 5432 занят локальным Postgres на машине разработчика
+      - "127.0.0.1:5433:5432" # 5432 занят локальным Postgres на машине разработчика
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U credit_kiosk -d credit_kiosk"]
       interval: 5s
@@ -42,7 +42,7 @@ services:
       redis:
         condition: service_started
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     restart: unless-stopped
 
   frontend:
@@ -52,7 +52,7 @@ services:
     # nginx не стартует, пока имя backend не резолвится: перезапуск снимает гонку при старте.
     restart: unless-stopped
     ports:
-      - "8080:80"
+      - "127.0.0.1:8080:80"
   ml:
     build: ./ml
     environment:

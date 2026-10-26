@@ -12,12 +12,13 @@
 
 1. [Состав репозитория](#состав-репозитория)
 2. [Запуск для проверяющих](#запуск-для-проверяющих)
-3. [Вход в админку](#вход-в-админку)
-4. [Demo-ИНН для защиты](#demo-инн-для-защиты)
-5. [Статусы заявки](#статусы-заявки)
-6. [Продукты](#продукты)
-7. [Локальная разработка](#локальная-разработка)
-8. [Troubleshooting](#troubleshooting)
+3. [Запуск на сервере](#запуск-на-сервере)
+4. [Вход в админку](#вход-в-админку)
+5. [Demo-ИНН для защиты](#demo-инн-для-защиты)
+6. [Статусы заявки](#статусы-заявки)
+7. [Продукты](#продукты)
+8. [Локальная разработка](#локальная-разработка)
+9. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -101,6 +102,28 @@ docker compose logs --tail 100 backend ml frontend
 
 У `postgres`, `backend`, `frontend` и `ml` должен быть статус `Up`. ML после
 инициализации должен перейти в `healthy`.
+
+---
+
+## Запуск на сервере
+
+Для домена `misisitmo.itatmisis.ru` используется production-файл с Caddy и
+автоматическим HTTPS:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+UI будет доступен на **https://misisitmo.itatmisis.ru**. Backend и PostgreSQL
+в production доступны только через localhost сервера, наружу открыты порты
+`80` и `443`.
+
+Посмотреть состояние и логи:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
+docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail 100
+```
 
 ---
 

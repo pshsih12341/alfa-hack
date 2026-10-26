@@ -1,0 +1,4 @@
+misisitmo.itatmisis.ru {
+    encode zstd gzip
+    reverse_proxy frontend:80
+}
