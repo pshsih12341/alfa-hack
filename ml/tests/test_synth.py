@@ -87,3 +87,30 @@ def test_refinanced_loans_belong_to_borrower(sample):
     owners = loans.loc[refinanced["refinance_loan_ids"].astype("int64"), "application_id"].to_numpy()
     assert (owners == refinanced["application_id"].to_numpy()).all()
     assert loans.loc[refinanced["refinance_loan_ids"].astype("int64"), "is_business"].all()
+
+
+def test_purposes_and_collateral(sample):
+    batch, _, gen = sample
+    apps = batch.applications
+    assert set(apps["purpose"]) <= set(load_config("scoring")["purposes"])
+    collateral = apps.groupby("purpose")["has_collateral"].mean()
+    assert collateral["real_estate"] > 0.7 and collateral["equipment"] > 0.5
+    assert collateral["working_capital"] < 0.2 and collateral["current_expenses"] < 0.15
+    terms = apps.groupby("purpose")["term_months"].mean()
+    assert terms["real_estate"] > terms["equipment"] > terms["working_capital"] > terms["current_expenses"]
+
+
+def test_application_details_do_not_shift_companies_and_flows():
+    """Цель, срок и залог — отдельный поток случайных чисел: базы-моки от них не зависят."""
+    base, _, gen = _build(seed=3, size=300)
+    changed = {**gen, "applications": {**gen["applications"],
+                                       "collateral_prob": {k: 0.5 for k in gen["applications"]["collateral_prob"]},
+                                       "purpose_split": {"working_capital": {"current_expenses": 1.0},
+                                                         "other": {"repair": 1.0}}}}
+    scoring = load_config("scoring")
+    ctx = Context(changed, scoring, InnFactory(np.random.default_rng(3)), IdCounter(), IdCounter())
+    other, _ = build_sample([Segment(300, changed)], MONTHS, ctx, np.random.SeedSequence(3))
+    pd.testing.assert_frame_equal(base.companies, other.companies)
+    pd.testing.assert_frame_equal(base.monthly, other.monthly)
+    pd.testing.assert_frame_equal(base.bki_loans, other.bki_loans)
+    assert not base.applications["has_collateral"].equals(other.applications["has_collateral"])

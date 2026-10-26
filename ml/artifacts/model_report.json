@@ -1,0 +1,666 @@
+{
+ "model1": {
+  "version": "stage1-woe-lr-2026.10.26",
+  "intercept": -2.7733,
+  "features": [
+   {
+    "name": "max_dpd_24m",
+    "iv": 0.4568,
+    "bins": 4,
+    "selected": true,
+    "coefficient": 0.889,
+    "std_error": 0.0473,
+    "p_value": 8.25e-79
+   },
+   {
+    "name": "revenue_size",
+    "iv": 0.2534,
+    "bins": 8,
+    "selected": true,
+    "coefficient": 0.5944,
+    "std_error": 0.0766,
+    "p_value": 8.45e-15
+   },
+   {
+    "name": "owner_track_record",
+    "iv": 0.1883,
+    "bins": 3,
+    "selected": true,
+    "coefficient": 0.6825,
+    "std_error": 0.0695,
+    "p_value": 9.27e-23
+   },
+   {
+    "name": "debt_to_revenue",
+    "iv": 0.1686,
+    "bins": 4,
+    "selected": true,
+    "coefficient": 0.9864,
+    "std_error": 0.0722,
+    "p_value": 1.65e-42
+   },
+   {
+    "name": "bki_inquiries_90d",
+    "iv": 0.1646,
+    "bins": 4,
+    "selected": true,
+    "coefficient": 0.436,
+    "std_error": 0.0773,
+    "p_value": 1.67e-08
+   },
+   {
+    "name": "business_age_months",
+    "iv": 0.1224,
+    "bins": 8,
+    "selected": true,
+    "coefficient": 1.0915,
+    "std_error": 0.0989,
+    "p_value": 2.54e-28
+   },
+   {
+    "name": "loan_to_revenue",
+    "iv": 0.1155,
+    "bins": 8,
+    "selected": true,
+    "coefficient": 0.8715,
+    "std_error": 0.101,
+    "p_value": 6.36e-18
+   },
+   {
+    "name": "okved_group",
+    "iv": 0.1018,
+    "bins": 7,
+    "selected": true,
+    "coefficient": 1.1307,
+    "std_error": 0.1069,
+    "p_value": 3.87e-26
+   },
+   {
+    "name": "has_tax_debt",
+    "iv": 0.0941,
+    "bins": 2,
+    "selected": true,
+    "coefficient": 0.7184,
+    "std_error": 0.0964,
+    "p_value": 8.99e-14
+   },
+   {
+    "name": "revenue_source",
+    "iv": 0.04,
+    "bins": 3,
+    "selected": false,
+    "reason": "p-value 0.787 больше 0.05"
+   },
+   {
+    "name": "legal_form",
+    "iv": 0.0271,
+    "bins": 2,
+    "selected": true,
+    "coefficient": 1.125,
+    "std_error": 0.2402,
+    "p_value": 2.82e-06
+   },
+   {
+    "name": "purpose",
+    "iv": 0.0157,
+    "bins": 6,
+    "selected": true,
+    "coefficient": 1.5492,
+    "std_error": 0.2874,
+    "p_value": 7.02e-08
+   },
+   {
+    "name": "has_collateral",
+    "iv": 0.0069,
+    "bins": 2,
+    "selected": true,
+    "coefficient": 0.9653,
+    "std_error": 0.4472,
+    "p_value": 0.0309
+   }
+  ],
+  "train_rows": 19000,
+  "train_default_rate": 0.0603,
+  "metrics": {
+   "train": {
+    "rows": 19000,
+    "default_rate": 0.0603,
+    "mean_pd": 0.0603,
+    "gini": 0.623,
+    "ks": 0.467,
+    "expert_gini": 0.598
+   },
+   "test_oot": {
+    "rows": 4750,
+    "default_rate": 0.052,
+    "mean_pd": 0.0608,
+    "gini": 0.626,
+    "ks": 0.489,
+    "score_psi": 0.0039,
+    "expert_gini": 0.624
+   },
+   "drift_macro_shock_05": {
+    "rows": 4750,
+    "default_rate": 0.0621,
+    "mean_pd": 0.0603,
+    "gini": 0.604,
+    "ks": 0.48,
+    "score_psi": 0.0015,
+    "expert_gini": 0.61,
+    "feature_psi": {
+     "business_age_months": 0.0034,
+     "okved_group": 0.0032,
+     "revenue_size": 0.0029
+    }
+   },
+   "drift_macro_shock_10": {
+    "rows": 4750,
+    "default_rate": 0.0611,
+    "mean_pd": 0.0593,
+    "gini": 0.645,
+    "ks": 0.52,
+    "score_psi": 0.0008,
+    "expert_gini": 0.654,
+    "feature_psi": {
+     "purpose": 0.0039,
+     "okved_group": 0.0034,
+     "loan_to_revenue": 0.003
+    }
+   },
+   "drift_macro_shock_20": {
+    "rows": 4750,
+    "default_rate": 0.0562,
+    "mean_pd": 0.0593,
+    "gini": 0.571,
+    "ks": 0.441,
+    "score_psi": 0.0033,
+    "expert_gini": 0.583,
+    "feature_psi": {
+     "revenue_size": 0.0025,
+     "business_age_months": 0.0018,
+     "loan_to_revenue": 0.0018
+    }
+   },
+   "drift_macro_shock_50": {
+    "rows": 4750,
+    "default_rate": 0.0716,
+    "mean_pd": 0.0577,
+    "gini": 0.596,
+    "ks": 0.464,
+    "score_psi": 0.0047,
+    "expert_gini": 0.592,
+    "feature_psi": {
+     "okved_group": 0.0047,
+     "business_age_months": 0.0045,
+     "loan_to_revenue": 0.0037
+    }
+   },
+   "drift_population_shift_05": {
+    "rows": 4750,
+    "default_rate": 0.0545,
+    "mean_pd": 0.0578,
+    "gini": 0.564,
+    "ks": 0.42,
+    "score_psi": 0.0049,
+    "expert_gini": 0.552,
+    "feature_psi": {
+     "business_age_months": 0.0021,
+     "loan_to_revenue": 0.002,
+     "revenue_size": 0.0015
+    }
+   },
+   "drift_population_shift_10": {
+    "rows": 4750,
+    "default_rate": 0.0611,
+    "mean_pd": 0.059,
+    "gini": 0.575,
+    "ks": 0.428,
+    "score_psi": 0.0018,
+    "expert_gini": 0.589,
+    "feature_psi": {
+     "business_age_months": 0.0084,
+     "okved_group": 0.0032,
+     "max_dpd_24m": 0.0021
+    }
+   },
+   "drift_population_shift_20": {
+    "rows": 4750,
+    "default_rate": 0.0613,
+    "mean_pd": 0.0618,
+    "gini": 0.619,
+    "ks": 0.488,
+    "score_psi": 0.0042,
+    "expert_gini": 0.629,
+    "feature_psi": {
+     "business_age_months": 0.0252,
+     "okved_group": 0.0034,
+     "purpose": 0.0026
+    }
+   },
+   "drift_population_shift_50": {
+    "rows": 4750,
+    "default_rate": 0.0688,
+    "mean_pd": 0.066,
+    "gini": 0.638,
+    "ks": 0.491,
+    "score_psi": 0.0137,
+    "expert_gini": 0.618,
+    "feature_psi": {
+     "business_age_months": 0.1462,
+     "okved_group": 0.0375,
+     "debt_to_revenue": 0.015
+    }
+   }
+  },
+  "calibration_test_oot": [
+   {
+    "decile": 1,
+    "rows": 475,
+    "mean_pd": 0.0062,
+    "default_rate": 0.0084
+   },
+   {
+    "decile": 2,
+    "rows": 475,
+    "mean_pd": 0.011,
+    "default_rate": 0.0042
+   },
+   {
+    "decile": 3,
+    "rows": 475,
+    "mean_pd": 0.0153,
+    "default_rate": 0.0021
+   },
+   {
+    "decile": 4,
+    "rows": 475,
+    "mean_pd": 0.0201,
+    "default_rate": 0.0189
+   },
+   {
+    "decile": 5,
+    "rows": 475,
+    "mean_pd": 0.0257,
+    "default_rate": 0.0211
+   },
+   {
+    "decile": 6,
+    "rows": 475,
+    "mean_pd": 0.0337,
+    "default_rate": 0.0295
+   },
+   {
+    "decile": 7,
+    "rows": 475,
+    "mean_pd": 0.0456,
+    "default_rate": 0.0526
+   },
+   {
+    "decile": 8,
+    "rows": 475,
+    "mean_pd": 0.066,
+    "default_rate": 0.0653
+   },
+   {
+    "decile": 9,
+    "rows": 475,
+    "mean_pd": 0.1086,
+    "default_rate": 0.0947
+   },
+   {
+    "decile": 10,
+    "rows": 475,
+    "mean_pd": 0.2757,
+    "default_rate": 0.2232
+   }
+  ]
+ },
+ "model2": {
+  "version": "stage2-woe-lr-2026.10.26",
+  "intercept": -2.824262,
+  "features": [
+   {
+    "name": "dscr",
+    "iv": 1.348,
+    "bins": 8,
+    "selected": true,
+    "coefficient": 0.7161,
+    "std_error": 0.0534,
+    "p_value": 6.05e-41
+   },
+   {
+    "name": "max_dpd_24m",
+    "iv": 0.4785,
+    "bins": 4,
+    "selected": true,
+    "coefficient": 0.7729,
+    "std_error": 0.0474,
+    "p_value": 8.17e-60
+   },
+   {
+    "name": "revenue_size",
+    "iv": 0.2588,
+    "bins": 8,
+    "selected": true,
+    "coefficient": 0.166,
+    "std_error": 0.0758,
+    "p_value": 0.0286
+   },
+   {
+    "name": "debt_to_revenue",
+    "iv": 0.2089,
+    "bins": 5,
+    "selected": true,
+    "coefficient": 0.5866,
+    "std_error": 0.0702,
+    "p_value": 6.33e-17
+   },
+   {
+    "name": "owner_track_record",
+    "iv": 0.2022,
+    "bins": 3,
+    "selected": true,
+    "coefficient": 0.642,
+    "std_error": 0.0693,
+    "p_value": 2.1e-20
+   },
+   {
+    "name": "bki_inquiries_90d",
+    "iv": 0.1788,
+    "bins": 4,
+    "selected": true,
+    "coefficient": 0.3779,
+    "std_error": 0.0772,
+    "p_value": 9.82e-07
+   },
+   {
+    "name": "loan_to_revenue",
+    "iv": 0.1688,
+    "bins": 8,
+    "selected": true,
+    "coefficient": 0.5502,
+    "std_error": 0.0886,
+    "p_value": 5.28e-10
+   },
+   {
+    "name": "okved_group",
+    "iv": 0.1137,
+    "bins": 7,
+    "selected": true,
+    "coefficient": 0.5485,
+    "std_error": 0.1133,
+    "p_value": 1.28e-06
+   },
+   {
+    "name": "business_age_months",
+    "iv": 0.1035,
+    "bins": 8,
+    "selected": true,
+    "coefficient": 0.5566,
+    "std_error": 0.1106,
+    "p_value": 4.88e-07
+   },
+   {
+    "name": "has_tax_debt",
+    "iv": 0.0969,
+    "bins": 2,
+    "selected": true,
+    "coefficient": 0.7055,
+    "std_error": 0.0993,
+    "p_value": 1.21e-12
+   },
+   {
+    "name": "revenue_consistency",
+    "iv": 0.0661,
+    "bins": 8,
+    "selected": false,
+    "reason": "коэффициент -0.05 не больше 0"
+   },
+   {
+    "name": "turnover_trend",
+    "iv": 0.0447,
+    "bins": 4,
+    "selected": true,
+    "coefficient": 0.3758,
+    "std_error": 0.1654,
+    "p_value": 0.0231
+   },
+   {
+    "name": "fcf_volatility",
+    "iv": 0.0414,
+    "bins": 7,
+    "selected": true,
+    "coefficient": 0.4751,
+    "std_error": 0.1878,
+    "p_value": 0.0114
+   },
+   {
+    "name": "legal_form",
+    "iv": 0.0191,
+    "bins": 2,
+    "selected": false,
+    "reason": "IV 0.019 меньше 0.02"
+   },
+   {
+    "name": "top_customer_share",
+    "iv": 0.0165,
+    "bins": 5,
+    "selected": false,
+    "reason": "IV 0.016 меньше 0.02"
+   },
+   {
+    "name": "purpose",
+    "iv": 0.0147,
+    "bins": 6,
+    "selected": true,
+    "coefficient": 1.4804,
+    "std_error": 0.3057,
+    "p_value": 1.28e-06
+   },
+   {
+    "name": "has_collateral",
+    "iv": 0.007,
+    "bins": 2,
+    "selected": true,
+    "coefficient": 1.0383,
+    "std_error": 0.4583,
+    "p_value": 0.0235
+   }
+  ],
+  "train_rows": 18455,
+  "train_default_rate": 0.0584,
+  "metrics": {
+   "train": {
+    "rows": 18455,
+    "default_rate": 0.0584,
+    "mean_pd": 0.0584,
+    "gini": 0.68,
+    "ks": 0.517,
+    "expert_gini": 0.676
+   },
+   "test_oot": {
+    "rows": 4626,
+    "default_rate": 0.0514,
+    "mean_pd": 0.059,
+    "gini": 0.675,
+    "ks": 0.53,
+    "score_psi": 0.0036,
+    "expert_gini": 0.697
+   },
+   "drift_macro_shock_05": {
+    "rows": 4618,
+    "default_rate": 0.0604,
+    "mean_pd": 0.0607,
+    "gini": 0.654,
+    "ks": 0.502,
+    "score_psi": 0.0043,
+    "expert_gini": 0.668,
+    "feature_psi": {
+     "turnover_trend": 0.0122,
+     "dscr": 0.0044,
+     "business_age_months": 0.0037
+    }
+   },
+   "drift_macro_shock_10": {
+    "rows": 4635,
+    "default_rate": 0.0589,
+    "mean_pd": 0.0592,
+    "gini": 0.707,
+    "ks": 0.553,
+    "score_psi": 0.002,
+    "expert_gini": 0.727,
+    "feature_psi": {
+     "turnover_trend": 0.0115,
+     "purpose": 0.0047,
+     "okved_group": 0.0035
+    }
+   },
+   "drift_macro_shock_20": {
+    "rows": 4625,
+    "default_rate": 0.0545,
+    "mean_pd": 0.0581,
+    "gini": 0.645,
+    "ks": 0.495,
+    "score_psi": 0.0027,
+    "expert_gini": 0.645,
+    "feature_psi": {
+     "turnover_trend": 0.0523,
+     "fcf_volatility": 0.004,
+     "dscr": 0.0024
+    }
+   },
+   "drift_macro_shock_50": {
+    "rows": 4610,
+    "default_rate": 0.0688,
+    "mean_pd": 0.0608,
+    "gini": 0.672,
+    "ks": 0.509,
+    "score_psi": 0.0028,
+    "expert_gini": 0.682,
+    "feature_psi": {
+     "turnover_trend": 0.2502,
+     "fcf_volatility": 0.0102,
+     "okved_group": 0.0052
+    }
+   },
+   "drift_population_shift_05": {
+    "rows": 4618,
+    "default_rate": 0.0522,
+    "mean_pd": 0.0567,
+    "gini": 0.617,
+    "ks": 0.478,
+    "score_psi": 0.0019,
+    "expert_gini": 0.615,
+    "feature_psi": {
+     "revenue_size": 0.0029,
+     "dscr": 0.0027,
+     "business_age_months": 0.0021
+    }
+   },
+   "drift_population_shift_10": {
+    "rows": 4602,
+    "default_rate": 0.0591,
+    "mean_pd": 0.0579,
+    "gini": 0.659,
+    "ks": 0.522,
+    "score_psi": 0.0025,
+    "expert_gini": 0.683,
+    "feature_psi": {
+     "business_age_months": 0.0053,
+     "turnover_trend": 0.0046,
+     "okved_group": 0.0033
+    }
+   },
+   "drift_population_shift_20": {
+    "rows": 4551,
+    "default_rate": 0.0584,
+    "mean_pd": 0.0618,
+    "gini": 0.673,
+    "ks": 0.531,
+    "score_psi": 0.0033,
+    "expert_gini": 0.678,
+    "feature_psi": {
+     "business_age_months": 0.0161,
+     "turnover_trend": 0.0154,
+     "dscr": 0.0056
+    }
+   },
+   "drift_population_shift_50": {
+    "rows": 4461,
+    "default_rate": 0.065,
+    "mean_pd": 0.0683,
+    "gini": 0.695,
+    "ks": 0.539,
+    "score_psi": 0.0248,
+    "expert_gini": 0.679,
+    "feature_psi": {
+     "turnover_trend": 0.0902,
+     "business_age_months": 0.0843,
+     "okved_group": 0.0346
+    }
+   }
+  },
+  "calibration_test_oot": [
+   {
+    "decile": 1,
+    "rows": 463,
+    "mean_pd": 0.0012,
+    "default_rate": 0.0
+   },
+   {
+    "decile": 2,
+    "rows": 463,
+    "mean_pd": 0.0026,
+    "default_rate": 0.0065
+   },
+   {
+    "decile": 3,
+    "rows": 462,
+    "mean_pd": 0.0059,
+    "default_rate": 0.0043
+   },
+   {
+    "decile": 4,
+    "rows": 463,
+    "mean_pd": 0.0129,
+    "default_rate": 0.0065
+   },
+   {
+    "decile": 5,
+    "rows": 462,
+    "mean_pd": 0.0212,
+    "default_rate": 0.0087
+   },
+   {
+    "decile": 6,
+    "rows": 463,
+    "mean_pd": 0.033,
+    "default_rate": 0.0281
+   },
+   {
+    "decile": 7,
+    "rows": 462,
+    "mean_pd": 0.049,
+    "default_rate": 0.0628
+   },
+   {
+    "decile": 8,
+    "rows": 463,
+    "mean_pd": 0.0709,
+    "default_rate": 0.0734
+   },
+   {
+    "decile": 9,
+    "rows": 462,
+    "mean_pd": 0.1143,
+    "default_rate": 0.0887
+   },
+   {
+    "decile": 10,
+    "rows": 463,
+    "mean_pd": 0.2786,
+    "default_rate": 0.2354
+   }
+  ]
+ }
+}

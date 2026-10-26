@@ -15,9 +15,10 @@ from types import SimpleNamespace
 import numpy as np
 import pandas as pd
 
-from alfa_ml.decision import heuristic, stop_rules
+from alfa_ml.decision import stop_rules
 from alfa_ml.features.build import model1_features, profile, repeat_profile, stage1_dscr
 from alfa_ml.finance import annuity_payment, rate_for_pd
+from alfa_ml.models.scorecard import MODEL1_FILE, load_model
 from alfa_ml.sources.read import SourceData
 
 SOURCE_NAMES = {"alfa_full": "обороты в Альфе за 12 мес.", "alfa_partial": "обороты в Альфе меньше 12 мес.",
@@ -31,6 +32,7 @@ class Application:
     purpose: str
     refinance_loan_ids: tuple[int, ...] = ()
     revenue_last12m: float | None = None
+    has_collateral: bool = False
 
 
 @dataclass(frozen=True)
@@ -60,8 +62,23 @@ class RevenueRequired(ValueError):
     """Выручки нет ни в источниках, ни в заявке — её нужно спросить у клиента."""
 
 
-def _rub(value: float) -> str:
+def rub(value: float) -> str:
     return f"{value:,.0f}".replace(",", " ")
+
+
+def percent(rate: float) -> str:
+    """Ставка для клиента: 0.175 → «17,5%»."""
+    return f"{round(rate * 100, 1):g}%".replace(".", ",")
+
+
+def product(app: Application) -> str:
+    """Продукт заявки — ключ таблицы products на бэкенде."""
+    return "collateral" if app.has_collateral else "no_collateral"
+
+
+def rate_buckets(scoring_cfg: dict, app: Application) -> list[dict]:
+    """Корзины ставок продукта: с залогом потери при дефолте ниже — и ставки ниже."""
+    return scoring_cfg["collateral_rate_buckets" if app.has_collateral else "rate_buckets"]
 
 
 def application_data(src: SourceData, app: Application, as_of) -> SimpleNamespace:
@@ -74,6 +91,8 @@ def application_data(src: SourceData, app: Application, as_of) -> SimpleNamespac
         "term_months": [app.term_months],
         "declared_revenue": [np.nan if app.revenue_last12m is None else float(app.revenue_last12m)],
         "refinance_loan_ids": [list(app.refinance_loan_ids)],
+        "purpose": [app.purpose],
+        "has_collateral": [app.has_collateral],
     })
     return SimpleNamespace(applications=applications, companies=src.companies, persons=src.persons,
                            bki_subjects=src.bki_subjects, bki_loans=src.bki_loans, monthly=src.monthly)
@@ -85,7 +104,11 @@ def flat_seasonality(scoring_cfg: dict) -> pd.DataFrame:
 
 
 def decide_stage1(src: SourceData, app: Application, as_of, scoring_cfg: dict, rules_cfg: dict,
-                  predict_pd=heuristic.predict_pd, model_version: str = heuristic.MODEL_VERSION) -> Decision:
+                  predict_pd=None, model_version: str | None = None) -> Decision:
+    """predict_pd и model_version по умолчанию — обученная модель 1 из ml/artifacts."""
+    if predict_pd is None:
+        model = load_model(MODEL1_FILE)
+        predict_pd, model_version = model.predict_pd, model.version
     hits = stop_rules.check_stop_rules(src.companies, src.persons, as_of, rules_cfg, scoring_cfg["stop_rules"])
     if hits:
         return Decision("REJECTED", 1, None, model_version, client_message=stop_rules.client_message(hits),
@@ -102,7 +125,7 @@ def decide_stage1(src: SourceData, app: Application, as_of, scoring_cfg: dict, r
                                                         scoring_cfg["amount_step"])])[::-1].astype(float)
     # PD этапа 1 зависит только от суммы (через долю в выручке), не от срока и ставки.
     pd_by_amount = predict_pd(model1_features(repeat_profile(prof, len(amounts)), amounts))
-    rate_by_amount = rate_for_pd(pd_by_amount, scoring_cfg["rate_buckets"])
+    rate_by_amount = rate_for_pd(pd_by_amount, rate_buckets(scoring_cfg, app))
     amount, term = np.meshgrid(amounts, terms, indexing="ij")
     rate = np.repeat(rate_by_amount[:, None], len(terms), axis=1)
     dscr = stage1_dscr(repeat_profile(prof, amount.size), amount.ravel(), term.ravel(), rate.ravel())
@@ -118,10 +141,11 @@ def decide_stage1(src: SourceData, app: Application, as_of, scoring_cfg: dict, r
     org = src.companies.iloc[0]
     source = prof["revenue_source"].iloc[0]
     reasons = [
-        f"Выручка этапа 1: {_rub(prof['revenue1'].iloc[0])} ₽ — {SOURCE_NAMES[source]}",
+        f"Выручка этапа 1: {rub(prof['revenue1'].iloc[0])} ₽ — {SOURCE_NAMES[source]}",
         f"PD этапа 1 на запрошенной сумме: {pd_requested:.1%}",
         f"DSCR по оценке потока на запрошенных условиях: {dscr[0, requested_term]:.2f} "
         f"(нужно не меньше {scoring_cfg['min_dscr']})",
+        f"Цель: {app.purpose}; продукт: {product(app)}",
     ]
     documents = ["alfaAccountConsent"] if bool(org["is_alfa_client"]) else ["bankStatements"]
     statements_hint = ("разрешите использовать обороты по вашему счёту" if bool(org["is_alfa_client"])
@@ -132,21 +156,18 @@ def decide_stage1(src: SourceData, app: Application, as_of, scoring_cfg: dict, r
                         client_message="К сожалению, сейчас мы не можем предоставить кредит.",
                         reasons=reasons + [f"PD выше порога отказа {stage1['decline_pd']:.0%}"])
 
-    max_by_term = []
-    for j, months in enumerate(terms):
-        rows = np.flatnonzero(passes[:, j])
-        max_by_term.append((int(months), option(rows[0], j) if rows.size else None))
+    max_by_term = max_by_term_options(passes, terms, option)
 
     if passes[0, requested_term]:
         approved = option(0, requested_term)
         return Decision("APPROVED", 1, pd_requested, model_version, approved=approved, max_by_term=max_by_term,
-                        client_message=f"Кредит одобрен: {_rub(approved.credit_sum)} ₽ на {approved.term_months} мес. "
-                                       f"под {approved.rate:.0%} годовых, платёж {_rub(approved.monthly_payment)} ₽ в месяц.",
+                        client_message=f"Кредит одобрен: {rub(approved.credit_sum)} ₽ на {approved.term_months} мес. "
+                                       f"под {percent(approved.rate)} годовых, платёж {rub(approved.monthly_payment)} ₽ в месяц.",
                         reasons=reasons + ["Запрошенные условия проходят по PD и DSCR"])
 
     grey_zone = pd_requested >= stage1["approve_pd"]
     if passes.any() and (not grey_zone or stage1["grey_zone_offer"]):
-        offers = _pick_offers(passes, max_by_term, requested_term, option)
+        offers = pick_offers(passes, max_by_term, requested_term, option)
         return Decision("OFFER", 1, pd_requested, model_version, offers=offers, max_by_term=max_by_term,
                         documents_required=documents,
                         client_message="Запрошенную сумму на этих условиях одобрить не можем. Выберите один из "
@@ -158,7 +179,16 @@ def decide_stage1(src: SourceData, app: Application, as_of, scoring_cfg: dict, r
                     reasons=reasons + ["Без выписок ни один вариант не проходит — нужен этап 2"])
 
 
-def _pick_offers(passes: np.ndarray, max_by_term: list, requested_term: int, option) -> list[Option]:
+def max_by_term_options(passes: np.ndarray, terms: np.ndarray, option) -> list[tuple[int, Option | None]]:
+    """Для каждого срока — максимальная проходящая сумма (суммы в сетке идут по убыванию)."""
+    result = []
+    for j, months in enumerate(terms):
+        rows = np.flatnonzero(passes[:, j])
+        result.append((int(months), option(rows[0], j) if rows.size else None))
+    return result
+
+
+def pick_offers(passes: np.ndarray, max_by_term: list, requested_term: int, option) -> list[Option]:
     """До двух вариантов: максимальная сумма на запрошенный срок; запрошенная сумма на самом коротком
     сроке, где она проходит, а если не проходит нигде — максимальная сумма на самом длинном сроке."""
     candidates = [max_by_term[requested_term][1]]
