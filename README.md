@@ -1,8 +1,10 @@
 # Кредитный кабинет для малого бизнеса
 
-[![Видео-демонстрация](https://img.youtube.com/vi/i3CTW6MuEII/maxresdefault.jpg)](https://youtu.be/i3CTW6MuEII)
+**▶ Демо-видео** — нажмите на картинку, видео откроется на YouTube:
 
-**Сайт:** https://misisitmo.itatmisis.ru
+[![Демо-видео: нажмите, чтобы посмотреть на YouTube](https://img.youtube.com/vi/i3CTW6MuEII/maxresdefault.jpg)](https://youtu.be/i3CTW6MuEII)
+
+**Видео:** https://youtu.be/i3CTW6MuEII · **Сайт:** https://misisitmo.itatmisis.ru
 
 Предприниматель подаёт заявку на кредит: сумма, срок, цель, ИНН. Всё остальное
 сервис берёт сам по ИНН — реестры, БКИ, ФНС, обороты в Альфе. ML-модели за
