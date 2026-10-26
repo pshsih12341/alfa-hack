@@ -23,6 +23,8 @@ const statusLabels = {
 }
 
 const PENDING_STATUSES = ['PRESCORING', 'SCORING']
+const MIN_PRESCORING_DELAY = 5_000
+const MAX_PRESCORING_DELAY = 10_000
 const MAX_STATEMENT_FILES = 5
 const MAX_STATEMENT_BYTES = 5 * 1024 * 1024
 
@@ -61,6 +63,7 @@ function CabinetPage({
   const [detailsLoading, setDetailsLoading] = useState(Boolean(initialApplicationId))
   const [detailsError, setDetailsError] = useState('')
   const [pollingExpired, setPollingExpired] = useState(false)
+  const [prescoringHold, setPrescoringHold] = useState(null)
   const [createRequested, setCreateRequested] = useState(false)
 
   const updateApplication = (application) => {
@@ -79,11 +82,20 @@ function CabinetPage({
     return onAddApplication(data)
   }
 
-  const openApplication = async (id, initialApplication) => {
+  const openApplication = async (id, initialApplication, forcePrescoring = false) => {
+    const currentApplication =
+      initialApplication || applications.find((application) => application.id === id)
+
     setActiveApplicationId(id)
-    setApplicationDetails(
-      initialApplication || applications.find((application) => application.id === id),
-    )
+    setApplicationDetails(currentApplication)
+    if (forcePrescoring || PENDING_STATUSES.includes(currentApplication?.status)) {
+      const delay =
+        MIN_PRESCORING_DELAY +
+        Math.floor(Math.random() * (MAX_PRESCORING_DELAY - MIN_PRESCORING_DELAY + 1))
+      setPrescoringHold({ applicationId: id, until: Date.now() + delay })
+    } else {
+      setPrescoringHold(null)
+    }
     setDetailsError('')
     setPollingExpired(false)
     setView('application')
@@ -101,9 +113,19 @@ function CabinetPage({
 
   useEffect(() => {
     if (initialApplicationId) {
-      openApplication(initialApplicationId, initialApplication)
+      openApplication(initialApplicationId, initialApplication, true)
     }
   }, [])
+
+  useEffect(() => {
+    if (!prescoringHold) return undefined
+
+    const timer = window.setTimeout(
+      () => setPrescoringHold(null),
+      Math.max(0, prescoringHold.until - Date.now()),
+    )
+    return () => window.clearTimeout(timer)
+  }, [prescoringHold])
 
   useEffect(() => {
     const status = applicationDetails?.status
@@ -168,6 +190,11 @@ function CabinetPage({
     setView('applications')
   }
 
+  const displayedApplication =
+    prescoringHold?.applicationId === activeApplicationId
+      ? { ...applicationDetails, status: 'PRESCORING' }
+      : applicationDetails
+
   return (
     <main className="cabinet">
       <header className="cabinet-header">
@@ -201,18 +228,18 @@ function CabinetPage({
           />
         )}
 
-        {view === 'application' && applicationDetails && (
+        {view === 'application' && displayedApplication && (
           <section className="cabinet-content">
             <div className="application-detail-header">
               <button type="button" onClick={openApplications}>← Все заявки</button>
               <div className="application-detail-header__meta">
-                <span>Заявка №{applicationDetails.number}</span>
-                <strong>{getCreditPurposeLabel(applicationDetails.purpose)}</strong>
+                <span>Заявка №{displayedApplication.number}</span>
+                <strong>{getCreditPurposeLabel(displayedApplication.purpose)}</strong>
               </div>
               <span
-                className={`application-detail-status application-detail-status_${applicationDetails.status.toLowerCase()}`}
+                className={`application-detail-status application-detail-status_${displayedApplication.status.toLowerCase()}`}
               >
-                {statusLabels[applicationDetails.status] || applicationDetails.status}
+                {statusLabels[displayedApplication.status] || displayedApplication.status}
               </span>
             </div>
 
@@ -220,7 +247,7 @@ function CabinetPage({
             {detailsError && <div className="details-message details-message_error">{detailsError}</div>}
             {!detailsLoading && (
               <ApplicationStatus
-                application={applicationDetails}
+                application={displayedApplication}
                 pollingExpired={pollingExpired}
                 onAccept={acceptApplication}
                 onAcceptOffer={acceptOffer}
@@ -814,10 +841,10 @@ function BankDetailsModal({ open, amount, term, rate, monthlyPayment, onClose, o
 }
 
 function PrescoringStatus({ expired, stage2 }) {
-  const [secondsLeft, setSecondsLeft] = useState(30)
+  const [secondsLeft, setSecondsLeft] = useState(10)
 
   useEffect(() => {
-    const deadline = Date.now() + 30_000
+    const deadline = Date.now() + 10_000
     const timer = window.setInterval(() => {
       setSecondsLeft(Math.max(0, Math.ceil((deadline - Date.now()) / 1000)))
     }, 1000)
