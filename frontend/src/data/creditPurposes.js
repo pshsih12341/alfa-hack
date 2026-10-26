@@ -1,5 +1,6 @@
 export const creditPurposeOptions = [
   { key: 'real_estate', content: 'Покупка недвижимости' },
+  { key: 'property', content: 'Покупка имущества' },
   { key: 'equipment', content: 'Покупка оборудования' },
   { key: 'repair', content: 'Ремонт' },
   { key: 'current_expenses', content: 'Текущие расходы' },

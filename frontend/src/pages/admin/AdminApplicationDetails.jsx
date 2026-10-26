@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Button } from '@alfalab/core-components-button'
 import { getCreditPurposeLabel } from '../../data/creditPurposes'
+import { formatMonths, formatRate } from '../../format'
 
 const statusLabels = {
   PRESCORING: 'Прескоринг',
@@ -34,9 +35,10 @@ const formatShortDate = (value) =>
 
 function AdminApplicationDetails({ application, onBack, onComplete }) {
   const [completing, setCompleting] = useState(false)
-  const hasDecision = ['SUCCESS', 'AWAITING_DISBURSEMENT', 'COMPLETED'].includes(
+  const hasDecision = ['SUCCESS', 'OFFER', 'AWAITING_DISBURSEMENT', 'COMPLETED'].includes(
     application.status,
   )
+  const rate = application.rate ?? application.product?.rate
 
   const completeApplication = async () => {
     setCompleting(true)
@@ -115,8 +117,12 @@ function AdminApplicationDetails({ application, onBack, onComplete }) {
                 value={formatMoney(application.approvedLimit)}
               />
               <DetailsRow
+                label="Срок"
+                value={application.termMonths ? formatMonths(application.termMonths) : '—'}
+              />
+              <DetailsRow
                 label="Ставка"
-                value={application.product ? `${application.product.rate}% годовых` : '—'}
+                value={rate != null ? `${formatRate(rate)} годовых` : '—'}
               />
             </dl>
           </article>

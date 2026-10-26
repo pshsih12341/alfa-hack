@@ -71,11 +71,15 @@
   font-weight: 700;
 }
 
-.application-card__status_info,
 .application-card__status_prescoring,
 .application-card__status_scoring {
   color: #805b00;
   background: #fff2cc;
+}
+
+.application-card__status_info {
+  color: #b54708;
+  background: #fff0e0;
 }
 
 .application-card__status_success,
@@ -131,6 +135,24 @@
 
 .new-application-required {
   color: #ef3124;
+}
+
+.new-application-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: #55555a;
+  font-size: 14px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.new-application-checkbox input {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  margin: 1px 0 0;
+  accent-color: #ef3124;
 }
 
 .new-application-error {

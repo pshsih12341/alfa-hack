@@ -6,6 +6,7 @@ import { PhoneInput } from '@alfalab/core-components-phone-input'
 import { Select } from '@alfalab/core-components-select'
 import Logo from '../components/Logo'
 import { creditPurposeOptions } from '../data/creditPurposes'
+import { creditSumError, innError, isValidInn, termOptions } from '../format'
 import './RegistrationPage.css'
 
 const initialForm = {
@@ -15,12 +16,9 @@ const initialForm = {
   termMonths: 24,
   inn: '',
   bkiConsent: false,
+  hasCollateral: false,
+  revenue: null,
 }
-
-const termOptions = [6, 12, 18, 24, 30, 36].map((months) => ({
-  key: String(months),
-  content: `${months} месяцев`,
-}))
 
 function RegistrationPage({ initialMode = 'registration', onAuthenticated }) {
   const [mode, setMode] = useState(initialMode)
@@ -35,8 +33,9 @@ function RegistrationPage({ initialMode = 'registration', onAuthenticated }) {
             form.creditSum &&
             form.purpose &&
             form.termMonths &&
-            form.inn &&
-            form.bkiConsent,
+            form.bkiConsent &&
+            !creditSumError(form.creditSum / 100) &&
+            isValidInn(form.inn),
         )
 
   const setField = (field, value) => {
@@ -173,6 +172,7 @@ function RegistrationFields({ form, setField }) {
         onChange={(_, { value }) => setField('creditSum', value)}
         currency="RUR"
         integersOnly
+        error={creditSumError(form.creditSum / 100) || false}
         required
       />
 
@@ -207,8 +207,29 @@ function RegistrationFields({ form, setField }) {
         }
         inputMode="numeric"
         maxLength={12}
+        error={innError(form.inn) || false}
         required
       />
+
+      <AmountInput
+        block
+        size={56}
+        label="Выручка за последние 12 месяцев"
+        hint="Необязательно. Укажите, если вашей выручки нет в открытых данных ФНС"
+        value={form.revenue}
+        onChange={(_, { value }) => setField('revenue', value)}
+        currency="RUR"
+        integersOnly
+      />
+
+      <label className="bki-consent">
+        <input
+          type="checkbox"
+          checked={form.hasCollateral}
+          onChange={(event) => setField('hasCollateral', event.target.checked)}
+        />
+        <span>Готов предоставить залог — ставка ниже, окончательные условия после оценки залога</span>
+      </label>
 
       <label className="bki-consent">
         <input
