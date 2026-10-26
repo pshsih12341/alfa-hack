@@ -47,7 +47,6 @@ class Product(Base):
 class Application(Base):
     __tablename__ = "applications"
     from sqlalchemy.orm import relationship
-    # в классе Application:
     client = relationship("User", lazy="joined")
 
     id = mapped_column(PostgreSQLUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -73,6 +72,7 @@ class Application(Base):
     refinance_loan_ids = mapped_column(JSON, nullable=True, default=list)
     requested_term_months = mapped_column(Integer, nullable=False, server_default="36")
     scoring_response = mapped_column(JSON, nullable=True)
+    has_collateral = mapped_column(Boolean, nullable=False, server_default="false")
 
 class ApplicationStatusHistory(Base):
     __tablename__ = "application_status_history"

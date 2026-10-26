@@ -1,0 +1,831 @@
+{
+ "version": "stage2-woe-lr-2026.10.26",
+ "intercept": -2.824262,
+ "coefficients": {
+  "dscr": 0.716131,
+  "max_dpd_24m": 0.772852,
+  "revenue_size": 0.165959,
+  "debt_to_revenue": 0.586643,
+  "owner_track_record": 0.641957,
+  "bki_inquiries_90d": 0.377874,
+  "loan_to_revenue": 0.550241,
+  "okved_group": 0.548464,
+  "business_age_months": 0.556554,
+  "has_tax_debt": 0.705538,
+  "turnover_trend": 0.375779,
+  "fcf_volatility": 0.47508,
+  "purpose": 1.480387,
+  "has_collateral": 1.0383
+ },
+ "binnings": {
+  "dscr": {
+   "name": "dscr",
+   "kind": "numeric",
+   "woe": [
+    0.859896,
+    0.687182,
+    0.19134,
+    0.157517,
+    -0.566009,
+    -1.527717,
+    -2.890487,
+    -3.822647
+   ],
+   "counts": [
+    4614,
+    1845,
+    923,
+    923,
+    3691,
+    1845,
+    2768,
+    1846
+   ],
+   "events": [
+    589,
+    202,
+    64,
+    62,
+    125,
+    24,
+    9,
+    2
+   ],
+   "edges": [
+    0.09199152946837469,
+    0.25146645561562836,
+    0.3373947497633013,
+    0.4248903156823035,
+    0.9210661260810479,
+    1.3249050583303545,
+    2.8128627471733503
+   ],
+   "groups": [],
+   "missing_woe": 0.859896,
+   "missing_count": 0,
+   "missing_events": 0,
+   "iv": 1.347969
+  },
+  "max_dpd_24m": {
+   "name": "max_dpd_24m",
+   "kind": "numeric",
+   "woe": [
+    -0.519821,
+    0.023756,
+    0.120796,
+    1.154558
+   ],
+   "counts": [
+    12449,
+    929,
+    1812,
+    2692
+   ],
+   "events": [
+    442,
+    55,
+    118,
+    442
+   ],
+   "edges": [
+    7.0,
+    16.0,
+    41.0
+   ],
+   "groups": [],
+   "missing_woe": -0.514811,
+   "missing_count": 573,
+   "missing_events": 20,
+   "iv": 0.478471
+  },
+  "revenue_size": {
+   "name": "revenue_size",
+   "kind": "numeric",
+   "woe": [
+    0.939786,
+    0.67762,
+    0.495894,
+    0.332487,
+    0.237464,
+    -0.028377,
+    -0.292916,
+    -0.702171
+   ],
+   "counts": [
+    923,
+    923,
+    1845,
+    923,
+    1845,
+    923,
+    6459,
+    4614
+   ],
+   "events": [
+    126,
+    100,
+    170,
+    73,
+    134,
+    52,
+    285,
+    137
+   ],
+   "edges": [
+    1018359.9463636364,
+    1612003.008,
+    2802861.674,
+    3515343.1849999996,
+    5117690.315000001,
+    6113154.1899999995,
+    20893053.595
+   ],
+   "groups": [],
+   "missing_woe": 0.939786,
+   "missing_count": 0,
+   "missing_events": 0,
+   "iv": 0.258771
+  },
+  "debt_to_revenue": {
+   "name": "debt_to_revenue",
+   "kind": "numeric",
+   "woe": [
+    -0.293751,
+    0.135566,
+    0.347177,
+    0.585003,
+    1.206251
+   ],
+   "counts": [
+    12918,
+    2768,
+    923,
+    923,
+    923
+   ],
+   "events": [
+    570,
+    183,
+    74,
+    92,
+    158
+   ],
+   "edges": [
+    0.09663323646322276,
+    0.19300997571965167,
+    0.2557165430807124,
+    0.3798596884767084
+   ],
+   "groups": [],
+   "missing_woe": 1.206251,
+   "missing_count": 0,
+   "missing_events": 0,
+   "iv": 0.20888
+  },
+  "owner_track_record": {
+   "name": "owner_track_record",
+   "kind": "categorical",
+   "woe": [
+    -0.281011,
+    -0.156553,
+    0.953047
+   ],
+   "counts": [
+    7415,
+    8871,
+    2169
+   ],
+   "events": [
+    331,
+    446,
+    300
+   ],
+   "edges": [],
+   "groups": [
+    [
+     "ok"
+    ],
+    [
+     "first"
+    ],
+    [
+     "problem"
+    ]
+   ],
+   "missing_woe": 0.953047,
+   "missing_count": 0,
+   "missing_events": 0,
+   "iv": 0.202228
+  },
+  "bki_inquiries_90d": {
+   "name": "bki_inquiries_90d",
+   "kind": "numeric",
+   "woe": [
+    -0.336884,
+    0.038361,
+    0.391193,
+    0.970335
+   ],
+   "counts": [
+    10418,
+    4817,
+    1887,
+    1333
+   ],
+   "events": [
+    441,
+    291,
+    158,
+    187
+   ],
+   "edges": [
+    1.0,
+    2.0,
+    3.0
+   ],
+   "groups": [],
+   "missing_woe": 0.970335,
+   "missing_count": 0,
+   "missing_events": 0,
+   "iv": 0.1788
+  },
+  "loan_to_revenue": {
+   "name": "loan_to_revenue",
+   "kind": "numeric",
+   "woe": [
+    -0.790597,
+    -0.373859,
+    -0.182972,
+    -0.127505,
+    0.043114,
+    0.347177,
+    0.560742,
+    0.98484
+   ],
+   "counts": [
+    1846,
+    1845,
+    4614,
+    1845,
+    5536,
+    923,
+    923,
+    923
+   ],
+   "events": [
+    50,
+    75,
+    226,
+    95,
+    336,
+    74,
+    90,
+    131
+   ],
+   "edges": [
+    0.02710805421792013,
+    0.038357135070239516,
+    0.06896097989622972,
+    0.08510562967528783,
+    0.19072663224194808,
+    0.2372175915040432,
+    0.33238028047078927
+   ],
+   "groups": [],
+   "missing_woe": 0.98484,
+   "missing_count": 0,
+   "missing_events": 0,
+   "iv": 0.168775
+  },
+  "okved_group": {
+   "name": "okved_group",
+   "kind": "categorical",
+   "woe": [
+    -0.56713,
+    -0.414894,
+    -0.286847,
+    -0.002645,
+    0.037127,
+    0.17819,
+    0.386639
+   ],
+   "counts": [
+    3695,
+    1792,
+    1450,
+    1107,
+    1480,
+    5517,
+    3414
+   ],
+   "events": [
+    125,
+    70,
+    64,
+    64,
+    89,
+    380,
+    285
+   ],
+   "edges": [],
+   "groups": [
+    [
+     "it_services"
+    ],
+    [
+     "manufacturing"
+    ],
+    [
+     "other"
+    ],
+    [
+     "food_service"
+    ],
+    [
+     "transport"
+    ],
+    [
+     "trade"
+    ],
+    [
+     "agriculture",
+     "construction"
+    ]
+   ],
+   "missing_woe": 0.386639,
+   "missing_count": 0,
+   "missing_events": 0,
+   "iv": 0.113655
+  },
+  "business_age_months": {
+   "name": "business_age_months",
+   "kind": "numeric",
+   "woe": [
+    0.503012,
+    0.164124,
+    0.064857,
+    -0.006751,
+    -0.127505,
+    -0.21046,
+    -0.428129,
+    -0.82214
+   ],
+   "counts": [
+    2769,
+    1843,
+    1845,
+    4612,
+    1845,
+    1850,
+    2768,
+    923
+   ],
+   "events": [
+    257,
+    125,
+    114,
+    267,
+    95,
+    88,
+    107,
+    24
+   ],
+   "edges": [
+    13.80205338809036,
+    22.373716632443532,
+    30.2258726899384,
+    54.53798767967146,
+    68.46817248459959,
+    89.6657084188912,
+    169.251745379877
+   ],
+   "groups": [],
+   "missing_woe": 0.503012,
+   "missing_count": 0,
+   "missing_events": 0,
+   "iv": 0.103532
+  },
+  "has_tax_debt": {
+   "name": "has_tax_debt",
+   "kind": "categorical",
+   "woe": [
+    -0.117412,
+    0.829316
+   ],
+   "counts": [
+    16876,
+    1579
+   ],
+   "events": [
+    881,
+    196
+   ],
+   "edges": [],
+   "groups": [
+    [
+     "0"
+    ],
+    [
+     "1"
+    ]
+   ],
+   "missing_woe": 0.829316,
+   "missing_count": 0,
+   "missing_events": 0,
+   "iv": 0.096948
+  },
+  "turnover_trend": {
+   "name": "turnover_trend",
+   "kind": "numeric",
+   "woe": [
+    0.455613,
+    0.251445,
+    -0.011891,
+    -0.169415
+   ],
+   "counts": [
+    1590,
+    2385,
+    2385,
+    9539
+   ],
+   "events": [
+    128,
+    159,
+    124,
+    428
+   ],
+   "edges": [
+    0.8658860735197539,
+    0.9521729153274334,
+    1.0060008761641215
+   ],
+   "groups": [],
+   "missing_woe": 0.0,
+   "missing_count": 2556,
+   "missing_events": 238,
+   "iv": 0.044679
+  },
+  "fcf_volatility": {
+   "name": "fcf_volatility",
+   "kind": "numeric",
+   "woe": [
+    -0.438976,
+    -0.438976,
+    -0.381915,
+    -0.119573,
+    0.031793,
+    0.18605,
+    0.228834
+   ],
+   "counts": [
+    923,
+    923,
+    923,
+    4613,
+    4614,
+    4613,
+    1846
+   ],
+   "events": [
+    35,
+    35,
+    37,
+    240,
+    277,
+    320,
+    133
+   ],
+   "edges": [
+    0.017440731677607527,
+    0.022048032352849217,
+    0.025844147321774563,
+    0.04183043000506783,
+    0.06078587918449081,
+    0.09689354215728997
+   ],
+   "groups": [],
+   "missing_woe": 0.228834,
+   "missing_count": 0,
+   "missing_events": 0,
+   "iv": 0.041389
+  },
+  "purpose": {
+   "name": "purpose",
+   "kind": "categorical",
+   "woe": [
+    -0.17004,
+    -0.134178,
+    -0.05381,
+    0.030898,
+    0.138868,
+    0.171033
+   ],
+   "counts": [
+    955,
+    3588,
+    7183,
+    1006,
+    1556,
+    4167
+   ],
+   "events": [
+    47,
+    184,
+    398,
+    60,
+    103,
+    285
+   ],
+   "edges": [],
+   "groups": [
+    [
+     "real_estate"
+    ],
+    [
+     "equipment"
+    ],
+    [
+     "property",
+     "working_capital"
+    ],
+    [
+     "repair"
+    ],
+    [
+     "refinancing"
+    ],
+    [
+     "current_expenses"
+    ]
+   ],
+   "missing_woe": 0.171033,
+   "missing_count": 0,
+   "missing_events": 0,
+   "iv": 0.01471
+  },
+  "has_collateral": {
+   "name": "has_collateral",
+   "kind": "categorical",
+   "woe": [
+    -0.136001,
+    0.051766
+   ],
+   "counts": [
+    5309,
+    13146
+   ],
+   "events": [
+    272,
+    805
+   ],
+   "edges": [],
+   "groups": [
+    [
+     "1"
+    ],
+    [
+     "0"
+    ]
+   ],
+   "missing_woe": 0.051766,
+   "missing_count": 0,
+   "missing_events": 0,
+   "iv": 0.007003
+  }
+ },
+ "info": {
+  "features": [
+   {
+    "name": "dscr",
+    "iv": 1.348,
+    "bins": 8,
+    "selected": true,
+    "coefficient": 0.7161,
+    "std_error": 0.0534,
+    "p_value": 6.05e-41
+   },
+   {
+    "name": "max_dpd_24m",
+    "iv": 0.4785,
+    "bins": 4,
+    "selected": true,
+    "coefficient": 0.7729,
+    "std_error": 0.0474,
+    "p_value": 8.17e-60
+   },
+   {
+    "name": "revenue_size",
+    "iv": 0.2588,
+    "bins": 8,
+    "selected": true,
+    "coefficient": 0.166,
+    "std_error": 0.0758,
+    "p_value": 0.0286
+   },
+   {
+    "name": "debt_to_revenue",
+    "iv": 0.2089,
+    "bins": 5,
+    "selected": true,
+    "coefficient": 0.5866,
+    "std_error": 0.0702,
+    "p_value": 6.33e-17
+   },
+   {
+    "name": "owner_track_record",
+    "iv": 0.2022,
+    "bins": 3,
+    "selected": true,
+    "coefficient": 0.642,
+    "std_error": 0.0693,
+    "p_value": 2.1e-20
+   },
+   {
+    "name": "bki_inquiries_90d",
+    "iv": 0.1788,
+    "bins": 4,
+    "selected": true,
+    "coefficient": 0.3779,
+    "std_error": 0.0772,
+    "p_value": 9.82e-07
+   },
+   {
+    "name": "loan_to_revenue",
+    "iv": 0.1688,
+    "bins": 8,
+    "selected": true,
+    "coefficient": 0.5502,
+    "std_error": 0.0886,
+    "p_value": 5.28e-10
+   },
+   {
+    "name": "okved_group",
+    "iv": 0.1137,
+    "bins": 7,
+    "selected": true,
+    "coefficient": 0.5485,
+    "std_error": 0.1133,
+    "p_value": 1.28e-06
+   },
+   {
+    "name": "business_age_months",
+    "iv": 0.1035,
+    "bins": 8,
+    "selected": true,
+    "coefficient": 0.5566,
+    "std_error": 0.1106,
+    "p_value": 4.88e-07
+   },
+   {
+    "name": "has_tax_debt",
+    "iv": 0.0969,
+    "bins": 2,
+    "selected": true,
+    "coefficient": 0.7055,
+    "std_error": 0.0993,
+    "p_value": 1.21e-12
+   },
+   {
+    "name": "revenue_consistency",
+    "iv": 0.0661,
+    "bins": 8,
+    "selected": false,
+    "reason": "коэффициент -0.05 не больше 0"
+   },
+   {
+    "name": "turnover_trend",
+    "iv": 0.0447,
+    "bins": 4,
+    "selected": true,
+    "coefficient": 0.3758,
+    "std_error": 0.1654,
+    "p_value": 0.0231
+   },
+   {
+    "name": "fcf_volatility",
+    "iv": 0.0414,
+    "bins": 7,
+    "selected": true,
+    "coefficient": 0.4751,
+    "std_error": 0.1878,
+    "p_value": 0.0114
+   },
+   {
+    "name": "legal_form",
+    "iv": 0.0191,
+    "bins": 2,
+    "selected": false,
+    "reason": "IV 0.019 меньше 0.02"
+   },
+   {
+    "name": "top_customer_share",
+    "iv": 0.0165,
+    "bins": 5,
+    "selected": false,
+    "reason": "IV 0.016 меньше 0.02"
+   },
+   {
+    "name": "purpose",
+    "iv": 0.0147,
+    "bins": 6,
+    "selected": true,
+    "coefficient": 1.4804,
+    "std_error": 0.3057,
+    "p_value": 1.28e-06
+   },
+   {
+    "name": "has_collateral",
+    "iv": 0.007,
+    "bins": 2,
+    "selected": true,
+    "coefficient": 1.0383,
+    "std_error": 0.4583,
+    "p_value": 0.0235
+   }
+  ],
+  "train_rows": 18455,
+  "train_default_rate": 0.0584,
+  "metrics": {
+   "train": {
+    "rows": 18455,
+    "default_rate": 0.0584,
+    "mean_pd": 0.0584,
+    "gini": 0.68,
+    "ks": 0.517,
+    "expert_gini": 0.676
+   },
+   "test_oot": {
+    "rows": 4626,
+    "default_rate": 0.0514,
+    "mean_pd": 0.059,
+    "gini": 0.675,
+    "ks": 0.53,
+    "score_psi": 0.0036,
+    "expert_gini": 0.697
+   }
+  },
+  "calibration_test_oot": [
+   {
+    "decile": 1,
+    "rows": 463,
+    "mean_pd": 0.0012,
+    "default_rate": 0.0
+   },
+   {
+    "decile": 2,
+    "rows": 463,
+    "mean_pd": 0.0026,
+    "default_rate": 0.0065
+   },
+   {
+    "decile": 3,
+    "rows": 462,
+    "mean_pd": 0.0059,
+    "default_rate": 0.0043
+   },
+   {
+    "decile": 4,
+    "rows": 463,
+    "mean_pd": 0.0129,
+    "default_rate": 0.0065
+   },
+   {
+    "decile": 5,
+    "rows": 462,
+    "mean_pd": 0.0212,
+    "default_rate": 0.0087
+   },
+   {
+    "decile": 6,
+    "rows": 463,
+    "mean_pd": 0.033,
+    "default_rate": 0.0281
+   },
+   {
+    "decile": 7,
+    "rows": 462,
+    "mean_pd": 0.049,
+    "default_rate": 0.0628
+   },
+   {
+    "decile": 8,
+    "rows": 463,
+    "mean_pd": 0.0709,
+    "default_rate": 0.0734
+   },
+   {
+    "decile": 9,
+    "rows": 462,
+    "mean_pd": 0.1143,
+    "default_rate": 0.0887
+   },
+   {
+    "decile": 10,
+    "rows": 463,
+    "mean_pd": 0.2786,
+    "default_rate": 0.2354
+   }
+  ]
+ }
+}

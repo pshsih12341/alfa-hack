@@ -43,16 +43,18 @@ services:
         condition: service_started
     ports:
       - "8000:8000"
+    restart: unless-stopped
 
   frontend:
     build: ./frontend
     depends_on:
       - backend
+    # nginx не стартует, пока имя backend не резолвится: перезапуск снимает гонку при старте.
+    restart: unless-stopped
     ports:
       - "8080:80"
   ml:
     build: ./ml
-    profiles: ["ml"]
     environment:
       ML_DATABASE_URL: postgresql://credit_kiosk:credit_kiosk@postgres:5432/mocks
     depends_on:

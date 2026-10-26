@@ -1,4 +1,5 @@
 from datetime import date, datetime, time as dtime, timezone
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
@@ -18,7 +19,6 @@ from ..schemas import (
     AdminStatusHistoryOut,
     AdminStatusUpdateRequest,
     AdminStatusUpdateResponse,
-    ApplicationDetails,
 )
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -55,7 +55,11 @@ def list_applications(
             AdminApplicationShort(
                 id=str(a.id),
                 clientId=a.client_id,
-                clientName=(a.client.company_name if a.client and a.client.company_name else (a.client.phone_number if a.client else "")),
+                clientName=(
+                    a.client.company_name 
+                    if a.client and a.client.company_name 
+                    else (a.client.phone_number if a.client else "")
+                ),
                 phoneNumber=a.client.phone_number if a.client else "",
                 inn=a.client.inn if a.client else "",
                 status=a.status,
@@ -74,10 +78,8 @@ def get_application(
     application_id: str,
     _admin: models.User = Depends(get_current_admin),
 ):
-    import uuid as _uuid
-
     try:
-        app_uuid = _uuid.UUID(application_id)
+        app_uuid = uuid.UUID(application_id)
     except ValueError:
         raise HTTPException(status_code=404, detail="Заявка не найдена")
 
@@ -87,7 +89,6 @@ def get_application(
             raise HTTPException(status_code=404, detail="Заявка не найдена")
 
         client = db.get(models.User, application.client_id)
-        product = db.get(models.Product, application.product_id) if application.product_id else None
         payment_orders = db.execute(
             select(models.PaymentOrder).where(
                 models.PaymentOrder.application_id == application.id
@@ -98,6 +99,38 @@ def get_application(
             .where(models.ApplicationStatusHistory.application_id == application.id)
             .order_by(models.ApplicationStatusHistory.created_at.asc())
         ).scalars().all()
+
+        # --- Логика сбора данных о продукте, ставке и сроке ---
+        # 1. Берем из БД (если accept уже был)
+        product_name = None
+        product_rate = application.rate
+        term_months = application.term_months or application.requested_term_months
+
+        if application.product_id:
+            product = db.get(models.Product, application.product_id)
+            if product:
+                product_name = product.product_name
+                if product_rate is None:
+                    product_rate = float(product.rate)
+
+        # 2. Если в БД нет (статусы OFFER, REJECTED, INFO) — берем из scoring_response (ML)
+        sr = application.scoring_response or {}
+        
+        if product_name is None and sr.get("product"):
+            p_code = sr.get("product")
+            # ML отдает код продукта (no_collateral или collateral) — берём имя из таблицы продуктов
+            by_code = db.execute(
+                select(models.Product).where(models.Product.code == p_code)
+            ).scalar_one_or_none()
+            product_name = by_code.product_name if by_code else str(p_code)
+                
+        if product_rate is None and sr.get("rate"):
+            product_rate = float(sr["rate"])
+            
+        if term_months is None and sr.get("termMonths"):
+            term_months = int(sr["termMonths"])
+
+        admin_product = AdminProductOut(product=product_name, rate=product_rate) if product_name else None
 
         return AdminApplicationDetails(
             id=str(application.id),
@@ -110,10 +143,10 @@ def get_application(
             creditSum=application.credit_sum,
             createdAt=application.created_at,
             updatedAt=application.updated_at,
-            product=AdminProductOut(
-                product=product.product_name, rate=float(product.rate)
-            ) if product else None,
+            product=admin_product,
             approvedLimit=application.approved_limit,
+            termMonths=term_months,
+            rate=product_rate,
             paymentOrders=[
                 AdminPaymentOrderOut(
                     id=str(p.id),
@@ -140,10 +173,8 @@ def complete(
     application_id: str,
     _admin: models.User = Depends(get_current_admin),
 ):
-    import uuid as _uuid
-
     try:
-        app_uuid = _uuid.UUID(application_id)
+        app_uuid = uuid.UUID(application_id)
     except ValueError:
         raise HTTPException(status_code=404, detail="Заявка не найдена")
 
@@ -180,16 +211,14 @@ def force_status(
     _admin: models.User = Depends(get_current_admin),
 ):
     """Demo-инструмент: принудительно перевести заявку в любой статус."""
-    import uuid as _uuid
-
     try:
-        app_uuid = _uuid.UUID(application_id)
+        app_uuid = uuid.UUID(application_id)
     except ValueError:
         raise HTTPException(status_code=404, detail="Заявка не найдена")
 
     allowed = {
         "PRESCORING", "SCORING", "INFO", "SUCCESS", "REJECTED",
-        "AWAITING_DISBURSEMENT", "COMPLETED",
+        "AWAITING_DISBURSEMENT", "COMPLETED", "OFFER"
     }
     if payload.status not in allowed:
         raise HTTPException(status_code=400, detail="Недопустимый статус")
@@ -206,6 +235,7 @@ def force_status(
             ).scalar_one_or_none()
             if no_col is not None:
                 application.product_id = no_col.id
+                
         db.add(
             models.ApplicationStatusHistory(
                 application_id=application.id, status=payload.status

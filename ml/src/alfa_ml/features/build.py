@@ -16,13 +16,15 @@ from alfa_ml.finance import annuity_payment
 MODEL1_FEATURES = [
     "legal_form", "business_age_months", "okved_group", "loan_to_revenue", "debt_to_revenue", "revenue_size",
     "revenue_source", "max_dpd_24m", "bki_inquiries_90d", "has_tax_debt", "owner_track_record",
+    "purpose", "has_collateral",
 ]
 MODEL2_FEATURES = [
     "legal_form", "business_age_months", "okved_group", "owner_track_record", "max_dpd_24m", "bki_inquiries_90d",
     "has_tax_debt", "loan_to_revenue", "debt_to_revenue", "revenue_size",
     "dscr", "fcf_volatility", "turnover_trend", "revenue_consistency", "top_customer_share",
+    "purpose", "has_collateral",
 ]
-CATEGORICAL = ["legal_form", "okved_group", "revenue_source", "owner_track_record"]
+CATEGORICAL = ["legal_form", "okved_group", "revenue_source", "owner_track_record", "purpose"]
 DAYS_PER_MONTH = 30.4375
 
 
@@ -89,6 +91,8 @@ def profile(data, scoring_cfg: dict, seasonality: pd.DataFrame) -> pd.DataFrame:
         "bki_inquiries_90d": external.borrower_inquiries(data.bki_subjects, ids),
         "has_tax_debt": (comp["ens_debt"] > feat["tax_debt_threshold"]).astype(int),
         "owner_track_record": external.worst_track_record(data.persons, ids, threshold),
+        "purpose": apps["purpose"],
+        "has_collateral": apps["has_collateral"].astype(int),
         "revenue1": _positive(revenue1),
         "business_debt": external.business_debt(loans, ids),
         "existing_payments": external.existing_payments(loans, ids),
@@ -111,7 +115,7 @@ def _positive(values: pd.Series) -> pd.Series:
 
 
 def model1_features(prof: pd.DataFrame, amount) -> pd.DataFrame:
-    """11 фич модели 1. amount — запрошенная сумма по строкам профиля."""
+    """13 фич модели 1. amount — запрошенная сумма по строкам профиля."""
     amount = np.asarray(amount, dtype=float)
     return pd.DataFrame({
         "legal_form": prof["legal_form"],
@@ -125,11 +129,13 @@ def model1_features(prof: pd.DataFrame, amount) -> pd.DataFrame:
         "bki_inquiries_90d": prof["bki_inquiries_90d"],
         "has_tax_debt": prof["has_tax_debt"],
         "owner_track_record": prof["owner_track_record"],
+        "purpose": prof["purpose"],
+        "has_collateral": prof["has_collateral"],
     }, index=prof.index)[MODEL1_FEATURES]
 
 
 def model2_features(prof: pd.DataFrame, amount, term, rate) -> pd.DataFrame:
-    """15 фич модели 2. Строки без достаточных выписок — пропуски в фичах из выписок."""
+    """17 фич модели 2. Строки без достаточных выписок — пропуски в фичах из выписок."""
     amount = np.asarray(amount, dtype=float)
     payment = annuity_payment(amount, rate, term) + prof["existing_payments"].to_numpy()
     return pd.DataFrame({
@@ -148,6 +154,8 @@ def model2_features(prof: pd.DataFrame, amount, term, rate) -> pd.DataFrame:
         "turnover_trend": prof["turnover_trend"],
         "revenue_consistency": prof["revenue2"] / prof["revenue1"],
         "top_customer_share": prof["top_customer_share"],
+        "purpose": prof["purpose"],
+        "has_collateral": prof["has_collateral"],
     }, index=prof.index)[MODEL2_FEATURES]
 
 
