@@ -228,6 +228,14 @@
   font-size: 11px;
 }
 
+.ready-offers .ready-offer__product {
+  min-height: 34px;
+  color: #111113;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
 .ready-offers span,
 .ready-offers small {
   color: #737378;

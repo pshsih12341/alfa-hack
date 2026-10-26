@@ -409,6 +409,9 @@ function OfferStatus({ application, onAccept }) {
                   <span>Готовый вариант</span>
                   <b>{selected ? '✓ Выбрано' : 'Выбрать'}</b>
                 </div>
+                {offer.product && (
+                  <span className="ready-offer__product">{offer.product}</span>
+                )}
                 <strong>{formatMoney(offer.creditSum)}</strong>
                 <small>
                   {formatMonths(offer.termMonths)} · {formatRate(offer.rate)} · {formatMoney(offer.monthlyPayment)} в месяц
