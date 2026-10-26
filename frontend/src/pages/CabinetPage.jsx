@@ -6,6 +6,7 @@ import { Modal } from '@alfalab/core-components-modal'
 import { api } from '../api'
 import Logo from '../components/Logo'
 import { getCreditPurposeLabel } from '../data/creditPurposes'
+import { CREDIT_SUM_MIN, formatMoney, formatMonths, formatRate, readFileAsBase64 } from '../format'
 import ApplicationsList from './cabinet/ApplicationsList'
 import PersonalData from './cabinet/PersonalData'
 import './CabinetPage.css'
@@ -21,8 +22,9 @@ const statusLabels = {
   REJECTED: 'Отклонено',
 }
 
-const formatMoney = (value) =>
-  `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 }).format(value)} ₽`
+const PENDING_STATUSES = ['PRESCORING', 'SCORING']
+const MAX_STATEMENT_FILES = 5
+const MAX_STATEMENT_BYTES = 5 * 1024 * 1024
 
 const calculateMonthlyPayment = (amount, annualRate, months) => {
   if (!amount || !months) return 0
@@ -32,6 +34,9 @@ const calculateMonthlyPayment = (amount, annualRate, months) => {
   const factor = (1 + monthlyRate) ** months
   return Math.round((amount * monthlyRate * factor) / (factor - 1))
 }
+
+// Сроки, на которые ML одобрил хотя бы минимальную сумму (maxSum = null — срок недоступен).
+const availableTerms = (maxByTerm) => (maxByTerm || []).filter((item) => item.maxSum)
 
 function CabinetPage({
   userData,
@@ -105,39 +110,31 @@ function CabinetPage({
     if (
       view !== 'application' ||
       !activeApplicationId ||
-      !['PRESCORING', 'SCORING'].includes(status)
+      !PENDING_STATUSES.includes(status)
     ) {
       return undefined
     }
 
-    const deadline = Date.now() + 30_000
-    let requestInProgress = false
+    // Первые 30 секунд опрашиваем часто, дальше реже, но не перестаём:
+    // если ML был недоступен, решение придёт после повторного скоринга.
+    const slowAfter = Date.now() + 30_000
+    let timer
 
     const poll = async () => {
-      if (Date.now() >= deadline) {
-        setPollingExpired(true)
-        window.clearInterval(timer)
-        return
-      }
-
-      if (requestInProgress) return
-      requestInProgress = true
-
       try {
         const details = await api.getApplication(activeApplicationId)
         updateApplication(details)
-        if (!['PRESCORING', 'SCORING'].includes(details.status)) {
-          window.clearInterval(timer)
-        }
+        if (!PENDING_STATUSES.includes(details.status)) return
       } catch (error) {
         setDetailsError(error.message)
-      } finally {
-        requestInProgress = false
       }
+      const slow = Date.now() >= slowAfter
+      if (slow) setPollingExpired(true)
+      timer = window.setTimeout(poll, slow ? 5000 : 1500)
     }
 
-    const timer = window.setInterval(poll, 1500)
-    return () => window.clearInterval(timer)
+    timer = window.setTimeout(poll, 1500)
+    return () => window.clearTimeout(timer)
   }, [activeApplicationId, applicationDetails?.status, view])
 
   const acceptApplication = async (data) => {
@@ -150,6 +147,20 @@ function CabinetPage({
     const response = await api.acceptOffer(activeApplicationId, data)
     updateApplication(response)
     return response
+  }
+
+  const submitStatements = async (data) => {
+    const response = await api.submitStatements(activeApplicationId, data)
+    setPollingExpired(false)
+    setDetailsError('')
+    // Сразу показываем, что идёт анализ выписок, не дожидаясь следующего опроса.
+    updateApplication({
+      ...response,
+      additionalInfo: {
+        useAlfaAccount: Boolean(data.useAlfaAccount),
+        statements: (data.statements || []).map(({ fileName }) => ({ fileName })),
+      },
+    })
   }
 
   const startNewApplication = () => {
@@ -213,6 +224,7 @@ function CabinetPage({
                 pollingExpired={pollingExpired}
                 onAccept={acceptApplication}
                 onAcceptOffer={acceptOffer}
+                onSubmitStatements={submitStatements}
                 onNewApplication={startNewApplication}
               />
             )}
@@ -237,28 +249,36 @@ function ApplicationStatus({
   pollingExpired,
   onAccept,
   onAcceptOffer,
+  onSubmitStatements,
   onNewApplication,
 }) {
   if (application.status === 'INFO') {
     return (
-      <MessageStatus
-        tone="info"
-        caption="Проверка приостановлена"
-        title="Нам потребовались дополнительные данные"
-        message={application.clientMessage || 'Для продолжения рассмотрения нужны дополнительные сведения.'}
-      />
+      <>
+        <MessageStatus
+          tone="info"
+          caption="Проверка приостановлена"
+          title="Нужны обороты по счетам"
+          message={application.clientMessage || 'Для продолжения рассмотрения нужны дополнительные сведения.'}
+        />
+        <StatementsForm documents={application.documentsRequired} onSubmit={onSubmitStatements} />
+      </>
     )
   }
 
   if (application.status === 'SUCCESS') {
-    if (!application.products?.[0]) {
-      return <div className="details-message details-message_error">Бэк не вернул одобренный продукт.</div>
-    }
     return <ApprovedStatus application={application} onAccept={onAccept} />
   }
 
   if (application.status === 'OFFER') {
-    return <OfferStatus application={application} onAccept={onAcceptOffer} />
+    return (
+      <>
+        <OfferStatus application={application} onAccept={onAcceptOffer} />
+        {application.documentsRequired?.length > 0 && (
+          <ReconsiderPanel documents={application.documentsRequired} onSubmit={onSubmitStatements} />
+        )}
+      </>
+    )
   }
 
   if (application.status === 'REJECTED') {
@@ -290,24 +310,53 @@ function ApplicationStatus({
     )
   }
 
-  return <PrescoringStatus expired={pollingExpired} />
+  const info = application.additionalInfo
+  const stage2 = Boolean(info?.useAlfaAccount || info?.statements?.length)
+  return <PrescoringStatus expired={pollingExpired} stage2={stage2} />
 }
 
 function ApprovedStatus({ application, onAccept }) {
-  const product = application.products[0]
+  const product = application.products?.[0]
+  const approved = application.approved
+
+  // Решение ML: одобренные условия и максимум по каждому сроку.
+  if (approved && availableTerms(application.maxByTerm).length) {
+    return (
+      <DecisionCalculator
+        application={application}
+        title={product?.product || 'Кредит одобрен'}
+        message={`Одобрено ${formatMoney(approved.creditSum)} на ${formatMonths(approved.termMonths)} под ${formatRate(approved.rate)}. Можно взять меньше или выбрать другой срок.`}
+        initialAmount={approved.creditSum}
+        initialTerm={approved.termMonths}
+        knownOptions={[approved]}
+        onAccept={(amount, term, bankDetails) => onAccept({ amount, termMonths: term, ...bankDetails })}
+      />
+    )
+  }
+
+  if (!product) {
+    return (
+      <div className="details-message details-message_error">
+        Не удалось загрузить условия одобрения. Обновите страницу.
+      </div>
+    )
+  }
+  return <ProductCalculator application={application} product={product} onAccept={onAccept} />
+}
+
+// Без ответа ML (mock-скоринг): лимиты продукта.
+function ProductCalculator({ application, product, onAccept }) {
   const termLimit = product.termLimit
+  const terms = []
+  for (let months = termLimit.min; months <= termLimit.max; months += termLimit.step) terms.push(months)
   const requestedAmount = application.creditSum || product.limit.min
-  const initialAmount = Math.min(product.limit.max, Math.max(product.limit.min, requestedAmount))
-  const initialTerm = Math.min(
-    termLimit.max,
-    Math.max(termLimit.min, application.termMonths || 24),
+  const [amount, setAmount] = useState(
+    Math.min(product.limit.max, Math.max(product.limit.min, requestedAmount)),
   )
-  const [amount, setAmount] = useState(initialAmount)
-  const [term, setTerm] = useState(initialTerm)
+  const [term, setTerm] = useState(
+    terms.includes(application.termMonths) ? application.termMonths : terms[terms.length - 1],
+  )
   const rate = application.rate ?? product.rate
-  const monthlyPayment = calculateMonthlyPayment(amount, rate, term)
-  const amountProgress = ((amount - product.limit.min) / (product.limit.max - product.limit.min)) * 100
-  const termProgress = ((term - termLimit.min) / (termLimit.max - termLimit.min)) * 100
 
   return (
     <CreditCalculator
@@ -316,84 +365,112 @@ function ApprovedStatus({ application, onAccept }) {
       amount={amount}
       setAmount={setAmount}
       amountLimit={product.limit}
+      terms={terms}
       term={term}
       setTerm={setTerm}
-      termLimit={termLimit}
       rate={rate}
-      monthlyPayment={monthlyPayment}
-      amountProgress={amountProgress}
-      termProgress={termProgress}
       onAccept={(bankDetails) => onAccept({ amount, termMonths: term, ...bankDetails })}
     />
   )
 }
 
 function OfferStatus({ application, onAccept }) {
-  const firstOffer = application.offers?.[0]
-  const firstTerm = firstOffer?.termMonths || application.termLimit.min
-  const firstTermData = application.maxByTerm.find((item) => item.termMonths === firstTerm)
-  const [term, setTerm] = useState(firstTerm)
-  const [amount, setAmount] = useState(firstOffer?.creditSum || firstTermData.maxSum)
-  const termData = application.maxByTerm.find((item) => item.termMonths === term)
-  const maxAmount = termData?.maxSum || application.limit.min
-  const amountLimit = { ...application.limit, max: maxAmount }
-  const rate = termData?.rate ?? firstOffer?.rate ?? application.rate
-  const monthlyPayment = calculateMonthlyPayment(amount, rate, term)
-  const amountProgress = maxAmount === application.limit.min
-    ? 100
-    : ((amount - application.limit.min) / (maxAmount - application.limit.min)) * 100
-  const termProgress = ((term - application.termLimit.min) /
-    (application.termLimit.max - application.termLimit.min)) * 100
+  const offers = application.offers || []
+  const firstOffer = offers[0]
+  const terms = availableTerms(application.maxByTerm)
+  const initialTerm = firstOffer?.termMonths ?? terms[terms.length - 1]?.termMonths
+  const initialAmount = firstOffer?.creditSum ?? terms[terms.length - 1]?.maxSum
 
-  const changeTerm = (nextTerm) => {
-    const next = application.maxByTerm.find((item) => item.termMonths === nextTerm)
-    setTerm(nextTerm)
-    setAmount((current) => Math.min(current, next.maxSum))
+  if (!terms.length) {
+    return <div className="details-message details-message_error">Не удалось загрузить варианты. Обновите страницу.</div>
   }
 
-  const chooseOffer = (offer) => {
-    setAmount(offer.creditSum)
-    setTerm(offer.termMonths)
+  return (
+    <DecisionCalculator
+      application={application}
+      title="Выберите подходящие условия"
+      message={application.clientMessage}
+      initialAmount={initialAmount}
+      initialTerm={initialTerm}
+      knownOptions={offers}
+      renderOffers={(amount, term, choose) => (
+        <div className="ready-offers">
+          {offers.map((offer) => {
+            const selected = offer.creditSum === amount && offer.termMonths === term
+
+            return (
+              <button
+                className={selected ? 'ready-offer ready-offer_selected' : 'ready-offer'}
+                key={`${offer.creditSum}-${offer.termMonths}`}
+                type="button"
+                onClick={() => choose(offer)}
+              >
+                <div className="ready-offer__top">
+                  <span>Готовый вариант</span>
+                  <b>{selected ? '✓ Выбрано' : 'Выбрать'}</b>
+                </div>
+                <strong>{formatMoney(offer.creditSum)}</strong>
+                <small>
+                  {formatMonths(offer.termMonths)} · {formatRate(offer.rate)} · {formatMoney(offer.monthlyPayment)} в месяц
+                </small>
+              </button>
+            )
+          })}
+        </div>
+      )}
+      onAccept={(amount, term, bankDetails) => onAccept({ creditSum: amount, termMonths: term, ...bankDetails })}
+    />
+  )
+}
+
+// Подбор суммы и срока в пределах решения ML: на каждом сроке — не больше maxByTerm[срок].maxSum,
+// недоступные сроки пропускаются. Ставка — готового варианта, если выбран он, иначе — срока.
+function DecisionCalculator({
+  application,
+  title,
+  message,
+  initialAmount,
+  initialTerm,
+  knownOptions,
+  renderOffers,
+  onAccept,
+}) {
+  const items = availableTerms(application.maxByTerm)
+  const terms = items.map((item) => item.termMonths)
+  const limitMin = application.limit?.min ?? CREDIT_SUM_MIN
+  const step = application.limit?.step || 50_000
+  const startTerm = terms.includes(initialTerm) ? initialTerm : terms[terms.length - 1]
+  const startItem = items.find((item) => item.termMonths === startTerm)
+  const [term, setTerm] = useState(startTerm)
+  const [amount, setAmount] = useState(Math.min(initialAmount || startItem.maxSum, startItem.maxSum))
+  const item = items.find((candidate) => candidate.termMonths === term)
+  const known = knownOptions.find((option) => option.creditSum === amount && option.termMonths === term)
+  const rate = known?.rate ?? item.rate
+
+  const changeTerm = (nextTerm) => {
+    const next = items.find((candidate) => candidate.termMonths === nextTerm)
+    setTerm(nextTerm)
+    setAmount((current) => Math.max(limitMin, Math.min(current, next.maxSum)))
+  }
+
+  const choose = (option) => {
+    setTerm(option.termMonths)
+    setAmount(option.creditSum)
   }
 
   return (
     <CreditCalculator
-      title="Выберите подходящие условия"
-      message={application.clientMessage}
+      title={title}
+      message={message}
       amount={amount}
       setAmount={setAmount}
-      amountLimit={amountLimit}
+      amountLimit={{ min: limitMin, max: item.maxSum, step }}
+      terms={terms}
       term={term}
       setTerm={changeTerm}
-      termLimit={application.termLimit}
       rate={rate}
-      monthlyPayment={monthlyPayment}
-      amountProgress={amountProgress}
-      termProgress={termProgress}
-      offers={
-      <div className="ready-offers">
-        {application.offers?.map((offer) => {
-          const selected = offer.creditSum === amount && offer.termMonths === term
-
-          return (
-            <button
-              className={selected ? 'ready-offer ready-offer_selected' : 'ready-offer'}
-              key={`${offer.creditSum}-${offer.termMonths}`}
-              type="button"
-              onClick={() => chooseOffer(offer)}
-            >
-              <div className="ready-offer__top">
-                <span>Готовый вариант</span>
-                <b>{selected ? '✓ Выбрано' : 'Выбрать'}</b>
-              </div>
-              <strong>{formatMoney(offer.creditSum)}</strong>
-              <small>{offer.termMonths} мес. · {offer.rate}% · {formatMoney(offer.monthlyPayment)} в месяц</small>
-            </button>
-          )
-        })}
-      </div>
-      }
-      onAccept={(bankDetails) => onAccept({ creditSum: amount, termMonths: term, ...bankDetails })}
+      offers={renderOffers?.(amount, term, choose)}
+      onAccept={(bankDetails) => onAccept(amount, term, bankDetails)}
     />
   )
 }
@@ -404,20 +481,22 @@ function CreditCalculator({
   amount,
   setAmount,
   amountLimit,
+  terms,
   term,
   setTerm,
-  termLimit,
   rate,
-  monthlyPayment,
-  amountProgress,
-  termProgress,
   offers,
   onAccept,
 }) {
   const [modalOpen, setModalOpen] = useState(false)
+  const monthlyPayment = calculateMonthlyPayment(amount, rate, term)
   const totalPayment = monthlyPayment * term
   const overpayment = Math.max(0, totalPayment - amount)
-  const amountStep = amountLimit.step || 100_000
+  const amountStep = amountLimit.step || 50_000
+  const amountRange = amountLimit.max - amountLimit.min
+  const amountProgress = amountRange > 0 ? ((amount - amountLimit.min) / amountRange) * 100 : 100
+  const termIndex = Math.max(0, terms.indexOf(term))
+  const termProgress = terms.length > 1 ? (termIndex / (terms.length - 1)) * 100 : 100
 
   return (
     <>
@@ -458,8 +537,9 @@ function CreditCalculator({
                 max={amountLimit.max}
                 step={amountStep}
                 value={amount}
+                disabled={amountRange <= 0}
                 style={{ '--range-progress': `${amountProgress}%` }}
-                onChange={(event) => setAmount(Number(event.target.value))}
+                onChange={(event) => setAmount(Math.min(amountLimit.max, Number(event.target.value)))}
               />
               <div className="calculator-range-labels">
                 <span>{formatMoney(amountLimit.min)}</span>
@@ -470,21 +550,22 @@ function CreditCalculator({
             <div className="calculator-field">
               <div className="calculator-field__heading">
                 <span>Срок кредита</span>
-                <strong>{term} месяцев</strong>
+                <strong>{formatMonths(term)}</strong>
               </div>
               <input
                 className="calculator-range"
                 type="range"
-                min={termLimit.min}
-                max={termLimit.max}
-                step={termLimit.step}
-                value={term}
+                min={0}
+                max={Math.max(0, terms.length - 1)}
+                step={1}
+                value={termIndex}
+                disabled={terms.length < 2}
                 style={{ '--range-progress': `${termProgress}%` }}
-                onChange={(event) => setTerm(Number(event.target.value))}
+                onChange={(event) => setTerm(terms[Number(event.target.value)])}
               />
               <div className="calculator-range-labels">
-                <span>{termLimit.min} месяцев</span>
-                <span>{termLimit.max} месяцев</span>
+                <span>{formatMonths(terms[0])}</span>
+                <span>{formatMonths(terms[terms.length - 1])}</span>
               </div>
             </div>
           </div>
@@ -494,8 +575,8 @@ function CreditCalculator({
             <strong>{formatMoney(monthlyPayment)}</strong>
             <dl>
               <div><dt>Сумма</dt><dd>{formatMoney(amount)}</dd></div>
-              <div><dt>Срок</dt><dd>{term} месяцев</dd></div>
-              <div><dt>Ставка</dt><dd>{rate}%</dd></div>
+              <div><dt>Срок</dt><dd>{formatMonths(term)}</dd></div>
+              <div><dt>Ставка</dt><dd>{formatRate(rate)}</dd></div>
               <div><dt>Переплата</dt><dd>{formatMoney(overpayment)}</dd></div>
             </dl>
             <Button type="button" view="accent" size={56} block onClick={() => setModalOpen(true)}>
@@ -515,6 +596,124 @@ function CreditCalculator({
         onSubmit={onAccept}
       />
     </>
+  )
+}
+
+// Этап 2: обороты по счёту в Альфе (alfaAccountConsent) или выписки других банков файлами 1С (bankStatements).
+function StatementsForm({ documents, onSubmit }) {
+  const useAlfaAccount = documents?.includes('alfaAccountConsent')
+  const [files, setFiles] = useState([])
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+
+  const addFiles = (event) => {
+    const picked = [...event.target.files]
+    event.target.value = ''
+    const tooBig = picked.find((file) => file.size > MAX_STATEMENT_BYTES)
+    if (tooBig) {
+      setError(`Файл ${tooBig.name} больше 5 МБ`)
+      return
+    }
+    const next = [...files, ...picked]
+    if (next.length > MAX_STATEMENT_FILES) {
+      setError(`Можно загрузить не больше ${MAX_STATEMENT_FILES} файлов`)
+      return
+    }
+    setFiles(next)
+    setError('')
+  }
+
+  const removeFile = (index) => setFiles((current) => current.filter((_, i) => i !== index))
+
+  const submit = async (makeData) => {
+    setSubmitting(true)
+    setError('')
+    try {
+      await onSubmit(await makeData())
+    } catch (requestError) {
+      setError(requestError.message)
+      setSubmitting(false)
+    }
+  }
+
+  const sendFiles = () =>
+    submit(async () => ({
+      statements: await Promise.all(
+        files.map(async (file) => ({ fileName: file.name, content: await readFileAsBase64(file) })),
+      ),
+    }))
+
+  return (
+    <section className="statements-card">
+      {useAlfaAccount ? (
+        <>
+          <h2>Обороты по счёту в Альфа-Банке</h2>
+          <p>
+            Разрешите использовать данные вашего расчётного счёта в Альфа-Банке — загружать выписки
+            не нужно, решение придёт через несколько секунд.
+          </p>
+          <Button
+            type="button"
+            view="accent"
+            size={56}
+            disabled={submitting}
+            onClick={() => submit(async () => ({ useAlfaAccount: true }))}
+          >
+            {submitting ? 'Отправляем…' : 'Использовать данные моего счёта'}
+          </Button>
+        </>
+      ) : (
+        <>
+          <h2>Выписки по расчётным счетам</h2>
+          <p>
+            Загрузите выгрузки из 1С или банк-клиента в формате 1CClientBankExchange (.txt) за последние
+            12 месяцев по всем счетам компании: до {MAX_STATEMENT_FILES} файлов, каждый до 5 МБ.
+          </p>
+          <label className="statements-upload">
+            <input type="file" accept=".txt,text/plain" multiple onChange={addFiles} disabled={submitting} />
+            <span>Выбрать файлы</span>
+          </label>
+          {files.length > 0 && (
+            <ul className="statements-files">
+              {files.map((file, index) => (
+                <li key={`${file.name}-${index}`}>
+                  <span>{file.name}</span>
+                  <small>{Math.max(1, Math.round(file.size / 1024))} КБ</small>
+                  <button type="button" onClick={() => removeFile(index)} disabled={submitting}>
+                    Убрать
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <Button
+            type="button"
+            view="accent"
+            size={56}
+            disabled={!files.length || submitting}
+            onClick={sendFiles}
+          >
+            {submitting ? 'Отправляем…' : 'Отправить выписки'}
+          </Button>
+        </>
+      )}
+      {error && <div className="details-message details-message_error">{error}</div>}
+    </section>
+  )
+}
+
+function ReconsiderPanel({ documents, onSubmit }) {
+  const [open, setOpen] = useState(false)
+
+  if (open) return <StatementsForm documents={documents} onSubmit={onSubmit} />
+
+  return (
+    <section className="statements-card statements-card_compact">
+      <p>Нужна сумма больше? Покажите обороты по счетам — мы пересмотрим решение.</p>
+      <Button type="button" view="secondary" size={48} onClick={() => setOpen(true)}>
+        Пересмотреть по выпискам
+      </Button>
+    </section>
   )
 }
 
@@ -563,7 +762,7 @@ function BankDetailsModal({ open, amount, term, rate, monthlyPayment, onClose, o
         ) : (
           <form id="receiving-details-form" className="receiving-details-form" onSubmit={submit}>
             <div className="offer-modal-summary">
-              <span>{rate}% годовых · {term} месяцев</span>
+              <span>{formatRate(rate)} годовых · {formatMonths(term)}</span>
               <strong>{formatMoney(amount)}</strong>
               <small>{formatMoney(monthlyPayment)} в месяц</small>
             </div>
@@ -611,7 +810,7 @@ function BankDetailsModal({ open, amount, term, rate, monthlyPayment, onClose, o
   )
 }
 
-function PrescoringStatus({ expired }) {
+function PrescoringStatus({ expired, stage2 }) {
   const [secondsLeft, setSecondsLeft] = useState(30)
 
   useEffect(() => {
@@ -626,8 +825,12 @@ function PrescoringStatus({ expired }) {
     <>
       <MessageStatus
         caption="Заявка принята"
-        title="Сейчас идёт прескоринг"
-        message="Мы анализируем данные вашего бизнеса. Как только проверка завершится, здесь появится решение."
+        title={stage2 ? 'Анализируем обороты по счетам' : 'Сейчас идёт прескоринг'}
+        message={
+          stage2
+            ? 'Считаем выручку и денежный поток по выпискам. Как только проверка завершится, здесь появится решение.'
+            : 'Мы анализируем данные вашего бизнеса. Как только проверка завершится, здесь появится решение.'
+        }
         timer={expired || secondsLeft === 0 ? 'Проверка занимает чуть больше времени' : `00:${String(secondsLeft).padStart(2, '0')}`}
       />
       <div className="status-note"><span className="status-note__icon">i</span><p>Статус обновится автоматически.</p></div>

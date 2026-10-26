@@ -4,6 +4,7 @@ import { Button } from '@alfalab/core-components-button'
 import { Modal } from '@alfalab/core-components-modal'
 import { Select } from '@alfalab/core-components-select'
 import { creditPurposeOptions, getCreditPurposeLabel } from '../../data/creditPurposes'
+import { creditSumError, termOptions } from '../../format'
 import './ApplicationsList.css'
 
 const statusLabels = {
@@ -21,12 +22,9 @@ const initialApplication = {
   creditSum: null,
   purpose: '',
   termMonths: 24,
+  hasCollateral: false,
+  revenue: null,
 }
-
-const termOptions = [6, 12, 18, 24, 30, 36].map((months) => ({
-  key: String(months),
-  content: `${months} месяцев`,
-}))
 
 const formatAmount = (value) => {
   if (!value) return 'Сумма не указана'
@@ -38,7 +36,9 @@ function ApplicationsList({ applications, onOpen, onAdd, openCreate, onCreateOpe
   const [form, setForm] = useState(initialApplication)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
-  const formComplete = Boolean(form.creditSum && form.purpose && form.termMonths)
+  const formComplete = Boolean(
+    form.creditSum && form.purpose && form.termMonths && !creditSumError(form.creditSum / 100),
+  )
 
   useEffect(() => {
     if (openCreate) {
@@ -155,6 +155,7 @@ function ApplicationsList({ applications, onOpen, onAdd, openCreate, onCreateOpe
               onChange={(_, { value }) => setField('creditSum', value)}
               currency="RUR"
               integersOnly
+              error={creditSumError(form.creditSum / 100) || false}
               required
             />
             <Select
@@ -184,6 +185,24 @@ function ApplicationsList({ applications, onOpen, onAdd, openCreate, onCreateOpe
                 setField('termMonths', Number(selected?.key || 24))
               }
             />
+            <AmountInput
+              block
+              size={56}
+              label="Выручка за последние 12 месяцев"
+              hint="Необязательно. Укажите, если вашей выручки нет в открытых данных ФНС"
+              value={form.revenue}
+              onChange={(_, { value }) => setField('revenue', value)}
+              currency="RUR"
+              integersOnly
+            />
+            <label className="new-application-checkbox">
+              <input
+                type="checkbox"
+                checked={form.hasCollateral}
+                onChange={(event) => setField('hasCollateral', event.target.checked)}
+              />
+              <span>Готов предоставить залог — ставка ниже, окончательные условия после оценки залога</span>
+            </label>
             {error && <div className="new-application-error">{error}</div>}
           </form>
         </Modal.Content>

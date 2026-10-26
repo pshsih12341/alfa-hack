@@ -55,6 +55,8 @@ export const api = {
   getApplication: (id) => request(`/api/applications/${id}`),
   acceptApplication: (id, data) => post(`/api/applications/${id}/accept`, data),
   acceptOffer: (id, data) => post(`/api/applications/${id}/accept-offer`, data),
+  // Этап 2: { useAlfaAccount: true } или { statements: [{ fileName, content }] } — content в base64.
+  submitStatements: (id, data) => post(`/api/applications/${id}/additional-info`, data),
   getAdminApplications,
   getAdminApplication: (id) => request(`/api/admin/applications/${id}`),
   completeAdminApplication: (id) =>

@@ -50,9 +50,10 @@ function App() {
         purpose: form.purpose,
         termMonths: form.termMonths,
         bkiConsent: form.bkiConsent,
-        revenueLast12m: null,
+        revenueLast12m: form.revenue ? form.revenue / 100 : null,
         refinanceLoanIds: [],
         companyName: null,
+        hasCollateral: form.hasCollateral,
       })
       applicationId = response.applicationId
     }
@@ -67,8 +68,11 @@ function App() {
 
   const handleAddApplication = async (data) => {
     const application = await api.createApplication({
-      ...data,
       creditSum: data.creditSum / 100,
+      purpose: data.purpose,
+      termMonths: data.termMonths,
+      hasCollateral: data.hasCollateral,
+      revenueLast12m: data.revenue ? data.revenue / 100 : null,
     })
     setApplications((current) => [...current, application])
     return application

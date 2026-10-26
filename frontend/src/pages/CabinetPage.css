@@ -132,11 +132,15 @@
   font-weight: 700;
 }
 
-.application-detail-status_info,
 .application-detail-status_prescoring,
 .application-detail-status_scoring {
   color: #805b00;
   background: #fff2cc;
+}
+
+.application-detail-status_info {
+  color: #b54708;
+  background: #fff0e0;
 }
 
 .application-detail-status_success,
@@ -241,7 +245,7 @@
   place-items: center;
   justify-self: center;
   border-radius: 50%;
-  background: #fff5d6;
+  background: #fff0e0;
 }
 
 .info-visual span {
@@ -251,14 +255,14 @@
   place-items: center;
   border-radius: 24px;
   color: #fff;
-  background: #e6a700;
+  background: #f07c1e;
   font-size: 42px;
   font-weight: 700;
   font-family: Georgia, serif;
 }
 
 .info-copy .prescoring-copy__caption {
-  color: #a16f00;
+  color: #b54708;
 }
 
 .info-copy__button {
@@ -716,7 +720,112 @@
   font-size: 14px;
 }
 
+.statements-card {
+  display: grid;
+  justify-items: start;
+  gap: 16px;
+  margin-top: 16px;
+  padding: 32px 56px;
+  border-radius: 28px;
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(16, 16, 18, 0.04);
+}
+
+.statements-card h2 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.statements-card p {
+  max-width: 640px;
+  margin: 0;
+  color: #6f6f73;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.statements-card .details-message {
+  margin: 0;
+  justify-self: stretch;
+}
+
+.statements-card_compact {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  justify-items: stretch;
+  padding: 20px 28px;
+}
+
+.statements-upload {
+  position: relative;
+  display: inline-flex;
+  padding: 12px 18px;
+  border: 1px dashed #c4c4c8;
+  border-radius: 14px;
+  color: #0b1f35;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.statements-upload:focus-within {
+  outline: 2px solid #ef3124;
+  outline-offset: 2px;
+}
+
+.statements-upload input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.statements-files {
+  display: grid;
+  gap: 8px;
+  justify-self: stretch;
+  max-width: 640px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.statements-files li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #f3f4f5;
+  font-size: 14px;
+}
+
+.statements-files span {
+  overflow-wrap: anywhere;
+}
+
+.statements-files small {
+  color: #737378;
+}
+
+.statements-files button {
+  border: none;
+  color: #a01810;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+
 @media (max-width: 760px) {
+  .statements-card {
+    padding: 24px 20px;
+  }
+
+  .statements-card_compact {
+    grid-template-columns: 1fr;
+  }
+
   .cabinet-header {
     height: 68px;
     padding: 0 16px;

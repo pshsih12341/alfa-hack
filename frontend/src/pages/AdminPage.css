@@ -243,10 +243,14 @@
 }
 
 .admin-status_prescoring,
-.admin-status_scoring,
-.admin-status_info {
+.admin-status_scoring {
   color: #805b00;
   background: #fff2cc;
+}
+
+.admin-status_info {
+  color: #b54708;
+  background: #fff0e0;
 }
 
 .admin-status_success,
