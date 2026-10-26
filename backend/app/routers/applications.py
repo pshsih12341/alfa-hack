@@ -165,44 +165,63 @@ def get_application(
 ):
     with SessionLocal() as db:
         application = _get_owned(db, application_id, user)
-        status = application.status
-        sr = application.scoring_response or {}
 
         products = None
-        if status == "SUCCESS" and application.product_id is not None:
-            selected = db.get(models.Product, application.product_id)
-            products = [_product_to_info(selected)] if selected else None
+        if application.status == "SUCCESS":
+            if application.product_id is not None:
+                selected = db.get(models.Product, application.product_id)
+                products = [_product_to_info(selected)] if selected else None
 
-        # Условия из ответа ML: одобренные (SUCCESS), варианты (OFFER), максимум по срокам и лимиты (оба).
-        with_terms = status in ("SUCCESS", "OFFER")
-        approved = OfferInfo(**sr["approved"]) if status == "SUCCESS" and sr.get("approved") else None
-        offers = [OfferInfo(**o) for o in sr.get("offers") or []] if status == "OFFER" else []
-        max_by_term = [MaxByTermItem(**m) for m in sr.get("maxByTerm") or []] if with_terms else []
+        offers = None
+        max_by_term = None
+        limit_range = None
+        term_limit_range = None
+        client_message = None
+        
+        if application.status == "OFFER" and application.scoring_response:
+            sr = application.scoring_response
+            
+            p_code = sr.get("product", "no_collateral")
+            if p_code == "collateral":
+                p_name = "Кредит для бизнеса под залог"
+            else:
+                p_name = "Кредит для бизнеса без залога"
 
+            if sr.get("offers"):
+                offers = [OfferInfo(**{**o, "product": p_name}) for o in sr["offers"]]
+            
+            if sr.get("maxByTerm"):
+                max_by_term = [MaxByTermItem(**{**m, "product": p_name}) for m in sr["maxByTerm"]]
+            
+            if sr.get("limit"):
+                limit_range = LimitRange(**sr["limit"])
+            
+            if sr.get("termLimit"):
+                term_limit_range = TermLimit(**sr["termLimit"])
+            
+            client_message = sr.get("clientMessage")
+            
         return ApplicationDetails(
             id=str(application.id),
             number=application.number,
             clientId=application.client_id,
-            status=status,
+            status=application.status,
             creditSum=application.credit_sum,
             purpose=application.purpose,
             createdAt=application.created_at,
             updatedAt=application.updated_at,
             products=products,
-            additionalInfo=_public_info(application.additional_info),
+            additionalInfo=application.additional_info,
             amount=application.amount,
             termMonths=application.term_months,
             rate=application.rate,
             approvedLimit=application.approved_limit,
-            approved=approved,
-            offers=offers or None,
-            maxByTerm=max_by_term or None,
-            limit=LimitRange(**sr["limit"]) if with_terms and sr.get("limit") else None,
-            termLimit=TermLimit(**sr["termLimit"]) if with_terms and sr.get("termLimit") else None,
-            clientMessage=sr.get("clientMessage") if status in ("SUCCESS", "OFFER", "INFO", "REJECTED") else None,
-            documentsRequired=sr.get("documentsRequired") if status in ("INFO", "OFFER") else None,
+            offers=offers,
+            maxByTerm=max_by_term,
+            limit=limit_range,
+            termLimit=term_limit_range,
+            clientMessage=client_message,
         )
-
 
 @router.post(
     "/{application_id}/additional-info",

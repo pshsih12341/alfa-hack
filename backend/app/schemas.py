@@ -115,14 +115,14 @@ class OfferInfo(BaseModel):
     termMonths: int
     rate: float
     monthlyPayment: int
-
+    product: str | None = None   
 
 class MaxByTermItem(BaseModel):
     termMonths: int
-    # None — на этом сроке не проходит даже минимальная сумма: срок недоступен.
-    maxSum: int | None = None
-    rate: float | None = None
-    monthlyPayment: int | None = None
+    maxSum: int
+    rate: float
+    monthlyPayment: int
+    product: str | None = None   
 
 
 class ApplicationDetails(BaseModel):
