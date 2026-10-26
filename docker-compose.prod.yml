@@ -1,8 +1,44 @@
+# Продакшен https://misisitmo.itatmisis.ru — поверх docker-compose.yml:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# Наружу открыт только Caddy (80 и 443, сертификат HTTPS получает сам). Postgres, бэкенд,
+# фронт и ML доступны только внутри сети compose. Redis бэкенд не использует (сессии в Postgres,
+# кэш в памяти) — на проде он не запускается. Нужен Docker Compose 2.24.4+ (теги !reset и !override).
+# Полный деплой на сервер — deploy/deploy.sh.
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
+  postgres:
+    ports: !reset []
+    restart: unless-stopped
+    mem_limit: 384m
+    logging: *logging
+
+  redis:
+    profiles: ["unused"]
+
   backend:
     environment:
       COOKIE_SECURE: "true"
       CORS_ORIGINS: https://misisitmo.itatmisis.ru
+    depends_on: !override
+      postgres:
+        condition: service_healthy
+    ports: !reset []
+    mem_limit: 384m
+    logging: *logging
+
+  frontend:
+    ports: !reset []
+    mem_limit: 64m
+    logging: *logging
+
+  ml:
+    logging: *logging
 
   caddy:
     image: caddy:2-alpine
@@ -17,6 +53,8 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     restart: unless-stopped
+    mem_limit: 128m
+    logging: *logging
 
 volumes:
   caddy_data:
