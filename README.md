@@ -4,7 +4,7 @@
 личный кабинет с заявками, админ-панель. Скоринг — отдельный ML-сервис
 с кредитной моделью (стоп-правила, риск, DSCR, подбор суммы и срока).
 
-Всё поднимается одной командой `docker compose --profile ml up`.
+Весь проект поднимается одной командой `docker compose up --build`.
 
 ---
 
@@ -12,7 +12,7 @@
 
 1. [Состав репозитория](#состав-репозитория)
 2. [Запуск для проверяющих](#запуск-для-проверяющих)
-3. [Запуск без ML (mock)](#запуск-без-ml-mock)
+3. [Вход в админку](#вход-в-админку)
 4. [Demo-ИНН для защиты](#demo-инн-для-защиты)
 5. [Статусы заявки](#статусы-заявки)
 6. [Продукты](#продукты)
@@ -56,11 +56,17 @@
 ```bash
 git clone <repo-url>
 cd alfa-hack
-docker compose --profile ml up --build
+docker compose up --build
 ```
 
 Первый запуск — 3–5 минут (сборка 3 образов, init Postgres, загрузка моков).
 Дальше — секунды.
+
+Чтобы запустить контейнеры в фоне:
+
+```bash
+docker compose up -d --build
+```
 
 Открыть в браузере: **http://localhost:8080**
 
@@ -74,7 +80,7 @@ Swagger backend: **http://localhost:8000/docs**
 | `backend` | python:3.12-slim | API, при старте миграции + seed продуктов |
 | `ml` | python + uv | ML-скоринг: `/score`, `/companies/{inn}` |
 | `postgres` | postgres:16 | две базы: `credit_kiosk` (основная) + `mocks` (для ML) |
-| `redis` | redis:7 | зарезервирован под сессии (этап 3) |
+| `redis` | redis:7 | инфраструктурный сервис; сессии пока хранятся в PostgreSQL |
 
 ### Порты на хосте
 
@@ -86,29 +92,49 @@ Swagger backend: **http://localhost:8000/docs**
 | `8001` | — | ML-сервис, только внутри compose-сети (`http://ml:8001`) |
 | `6379` | — | Redis, только внутри compose-сети |
 
-### Пересоздать БД с нуля
+### Проверка запуска
 
 ```bash
-docker compose --profile ml down -v
-docker compose --profile ml up --build
+docker compose ps
+docker compose logs --tail 100 backend ml frontend
 ```
 
-`-v` удаляет том `pgdata` — Postgres пересоздаст обе базы и загрузит моки из
-`mocks/mocks_postgres.sql`.
+У `postgres`, `backend`, `frontend` и `ml` должен быть статус `Up`. ML после
+инициализации должен перейти в `healthy`.
 
 ---
 
-## Запуск без ML (mock)
+## Вход в админку
 
-Если ML-сервис недоступен или нужен быстрый старт без моков:
+Администратор не создаётся автоматически. После первого запуска стека выполните:
 
 ```bash
+docker compose exec backend python scripts/seed_admin.py +79990009999
+```
+
+Скрипт идемпотентный: если пользователь с таким номером уже зарегистрирован,
+он получит `is_admin=true`; иначе будет создан новый администратор.
+
+После этого откройте **http://localhost:8080**, переключитесь на «Вход» и введите:
+
+```text
++7 999 000-99-99
+```
+
+Пароль не требуется. Бэкенд вернёт `isAdmin: true`, и фронтенд откроет таблицу
+всех заявок. Из карточки заявки в статусе `AWAITING_DISBURSEMENT` администратор
+может проверить платёжное поручение и нажать «Заявка исполнена».
+
+### Пересоздать БД с нуля
+
+```bash
+docker compose down -v
 docker compose up --build
 ```
 
-В `backend.environment` должен быть `SCORING_MODE: mock` — детерминированная
-заглушка (SUCCESS если `creditSum <= 30 000 000`, иначе REJECTED). Без `/score`,
-без моков.
+`-v` удаляет том `pgdata` — Postgres пересоздаст обе базы и загрузит моки из
+`mocks/mocks_postgres.sql`. После удаления тома администратора нужно создать
+повторно командой из раздела выше.
 
 ---
 
@@ -154,7 +180,7 @@ INFO      → PRESCORING              (этап 2)
 | `INFO` | нужны документы (этап 2) | ML `decision: INFO` |
 | `OFFER` | предложены варианты | ML `decision: OFFER` |
 | `AWAITING_DISBURSEMENT` | условия приняты, создано поручение | `accept` / `accept-offer` |
-| `COMPLETED` | админ подтвердил | `POST /admin/.../complete` |
+| `COMPLETED` | админ подтвердил | `POST /api/admin/applications/{id}/complete` |
 
 Переходы `PRESCORING → SUCCESS/REJECTED/INFO/OFFER` делает ML через `/score`.
 
@@ -165,8 +191,10 @@ INFO      → PRESCORING              (этап 2)
 | code | name | rate | limit | term |
 |---|---|---|---|---|
 | `no_collateral` | Кредит для бизнеса без залога | из ML (18–24% по риску) | 100 000 – 30 000 000 | 6–36, шаг 6 |
+| `collateral` | Кредит для бизнеса под залог | из ML (17,5–20,5% по риску) | 100 000 – 30 000 000 | 6–36, шаг 6 |
 
-`collateral` (под залог) — legacy в БД, скоринг его не выбирает.
+Продукт выбирается по полю `hasCollateral`. Фактическую ставку заявки возвращает
+ML; ставка из таблицы продуктов используется как базовая.
 
 Seed: `backend/scripts/seed_products.py` (идемпотентный, запускается в entrypoint).
 
@@ -196,7 +224,7 @@ npm install
 npm run dev
 ```
 
-Vite на `:5173`, прокси `/api` → `:8000` в `vite.config.ts`.
+Vite на `:5173`, прокси `/api` → `:8000` в `vite.config.js`.
 
 ### ML
 
@@ -240,11 +268,10 @@ docker compose exec postgres psql -U credit_kiosk -d credit_kiosk \
 
 ### `entrypoint.sh: not found`
 
-CRLF-переносы:
+Пересоберите образ backend. Dockerfile сам переводит `entrypoint.sh` из CRLF в LF:
 
 ```bash
-sed -i 's/\r$//' backend/entrypoint.sh
-docker compose --profile ml up -d --build backend
+docker compose up -d --build backend
 ```
 
 ---
@@ -256,13 +283,13 @@ docker compose --profile ml up -d --build backend
 - Auth: reg, login, logout, `/me`
 - Заявки: список, создание, детали, accept (SUCCESS), accept-offer (OFFER)
 - Админ: список с фильтром по датам, детали, complete
-- ML: `/score`, offer-флоу, fallback на таймауте
+- INFO-флоу: согласие на данные счёта в Альфе или загрузка выписок
+- ML: `/score`, повторный скоринг, offer-флоу, fallback на таймауте
 - Моки внешних источников (12 таблиц, 2000 компаний)
-- Docker-стек: `--profile ml`, entrypoint с миграциями и seed
+- Docker-стек: frontend, backend, ML, PostgreSQL и Redis; entrypoint с миграциями и seed
 
-### В работе (этап 3)
+### В работе
 
-- `INFO`-флоу (дозапрос выписок / `useAlfaAccount`)
 - Прокси `/api/companies/{inn}` и `/loans`
 - `RedisSessionStore` — сессии в Redis
 - Аудит-лог действий администратора
