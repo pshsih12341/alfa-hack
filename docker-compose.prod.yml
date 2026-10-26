@@ -38,6 +38,8 @@ services:
     logging: *logging
 
   ml:
+    # На сервере ML в покое занимает ~170 МБ; разбор пяти выписок по 5 МБ не должен упираться в лимит.
+    mem_limit: 512m
     logging: *logging
 
   caddy:
